@@ -1,0 +1,9 @@
+.vscode
+lua-5.1.5/
+src/ver.h
+obj/
+bin/
+VERSION
+*.o
+*.exe
+*.a
