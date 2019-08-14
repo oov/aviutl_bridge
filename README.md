@@ -161,6 +161,17 @@ int main(){
 }
 ```
 
+## 更新履歴
+
+### v0.2 2019-08-14
+
+- 小さいメモリリークを修正
+
+
+### v0.1 2019-08-14
+
+- 初版
+
 ## Credits
 
 bridge.auf / bridge.dll is made possible by the following open source softwares.
