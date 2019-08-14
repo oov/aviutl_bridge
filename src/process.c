@@ -79,6 +79,9 @@ cleanup:
 WCHAR *get_working_directory(const WCHAR *exe_path) {
     int exe_pathlen = lstrlenW(exe_path) + 1;
     WCHAR *path = calloc(exe_pathlen, sizeof(WCHAR));
+    if (!path) {
+        return NULL;
+    }
     int pathlen = 0;
     if (*exe_path == L'"') {
         ++exe_path;
@@ -92,15 +95,18 @@ WCHAR *get_working_directory(const WCHAR *exe_path) {
     }
     int dirlen = GetFullPathNameW(path, 0, NULL, NULL);
     if (dirlen == 0) {
+        free(path);
         return NULL;
     }
     WCHAR *dir = calloc(dirlen, sizeof(WCHAR));
     WCHAR *fn = NULL;
     if (GetFullPathNameW(path, dirlen, dir, &fn) == 0) {
         free(dir);
+        free(path);
         return NULL;
     }
     *fn = '\0';
+    free(path);
     return dir;
 }
 
