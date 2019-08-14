@@ -23,7 +23,7 @@ struct process
     HANDLE err_r;
 };
 
-WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
+static WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
 {
     LPWCH envstr = GetEnvironmentStringsW();
     if (!envstr)
@@ -76,7 +76,7 @@ cleanup:
     return NULL;
 }
 
-WCHAR *get_working_directory(const WCHAR *exe_path) {
+static WCHAR *get_working_directory(const WCHAR *exe_path) {
     int exe_pathlen = lstrlenW(exe_path) + 1;
     WCHAR *path = calloc(exe_pathlen, sizeof(WCHAR));
     if (!path) {
@@ -110,7 +110,7 @@ WCHAR *get_working_directory(const WCHAR *exe_path) {
     return dir;
 }
 
-int read_worker(void *userdata)
+static int read_worker(void *userdata)
 {
     struct process *self = userdata;
     while (1)

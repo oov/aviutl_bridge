@@ -27,7 +27,7 @@ void *g_view = NULL;
 struct process_map *g_process_map = NULL;
 thread_mutex_t g_mutex;
 
-BOOL bridge_init(FILTER *fp)
+static BOOL bridge_init(FILTER *fp)
 {
     StringCbPrintfW(g_mapped_file_name, 32, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
     stbds_sh_new_arena(g_process_map);
@@ -72,7 +72,7 @@ BOOL bridge_init(FILTER *fp)
     return TRUE;
 }
 
-BOOL bridge_exit(FILTER *fp)
+static BOOL bridge_exit(FILTER *fp)
 {
     thread_mutex_lock(&g_mutex);
     if (g_process_map)
@@ -99,7 +99,7 @@ BOOL bridge_exit(FILTER *fp)
     return TRUE;
 }
 
-int bridge_call_core(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
+static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
 {
     if (g_bufsize == 0 || !g_view)
     {
@@ -168,7 +168,7 @@ int bridge_call_core(const char *exe_path, const void *buf, int32_t len, struct 
     return ECALL_OK;
 }
 
-int bridge_call(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
+static int bridge_call(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
 {
     thread_mutex_lock(&g_mutex);
     int ret = bridge_call_core(exe_path, buf, len, mem, r, rlen);
