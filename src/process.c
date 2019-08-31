@@ -110,34 +110,45 @@ static WCHAR *get_working_directory(const WCHAR *exe_path) {
     return dir;
 }
 
+static BOOL read(HANDLE h, void *buf, DWORD sz)
+{
+    for (DWORD read; sz > 0; buf += read, sz -= read)
+    {
+        if (!ReadFile(h, buf, sz, &read, NULL))
+        {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static BOOL write(HANDLE h, const void *buf, DWORD sz)
+{
+    for (DWORD written; sz > 0; buf += written, sz -= written) {
+        if (!WriteFile(h, buf, sz, &written, NULL))
+        {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 static int read_worker(void *userdata)
 {
     struct process *self = userdata;
     while (1)
     {
         int32_t sz;
-        DWORD read;
-        if (!ReadFile(self->out_r, &sz, sizeof(sz), &read, NULL))
-        {
-            goto error;
-        }
-        if (read != sizeof(sz))
+        if (!read(self->out_r, &sz, sizeof(sz)))
         {
             goto error;
         }
         struct queue_item *qi = malloc(sizeof(struct queue_item) + sz);
         qi->buf = qi + 1;
         qi->len = sz;
-        if (sz > 0)
+        if (!read(self->out_r, qi->buf, sz))
         {
-            if (!ReadFile(self->out_r, qi->buf, sz, &read, NULL))
-            {
-                goto error;
-            }
-            if (read != sz)
-            {
-                goto error;
-            }
+            goto error;
         }
         thread_queue_produce(&self->queue, qi, 60000);
     }
@@ -156,25 +167,11 @@ static int read_worker(void *userdata)
 int process_write(struct process *self, const void *buf, size_t len)
 {
     int32_t sz = len;
-    DWORD written;
-    if (!WriteFile(self->in_w, &sz, sizeof(sz), &written, NULL))
-    {
+    if (!write(self->in_w, &sz, sizeof(sz))) {
         return 1;
     }
-    if (written != sizeof(sz))
-    {
-        return 2;
-    }
-    if (len > 0)
-    {
-        if (!WriteFile(self->in_w, buf, len, &written, NULL))
-        {
-            return 3;
-        }
-        if (written != len)
-        {
-            return 4;
-        }
+    if (!write(self->in_w, buf, len)) {
+        return 3;
     }
     return 0;
 }
