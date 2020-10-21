@@ -3,7 +3,6 @@
 #include "thread.h"
 #include <windows.h>
 #include <stdint.h>
-#include <strsafe.h>
 
 struct queue_item
 {
@@ -49,25 +48,15 @@ static WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
     }
 
     WCHAR *dest = newenv;
-    if (StringCchCopyW(dest, len, name) != S_OK)
-    {
-        goto cleanup;
-    }
+    lstrcpyW(dest, name);
     dest += name_len;
     *dest++ = L'=';
     len -= name_len + 1;
-
-    if (StringCchCopyW(dest, len, value) != S_OK)
-    {
-        goto cleanup;
-    }
+    lstrcpyW(dest, value);
     dest += value_len + 1;
     len -= value_len + 1;
 
-    if (memcpy_s(dest, len * sizeof(WCHAR), envstr, len * sizeof(WCHAR)))
-    {
-        goto cleanup;
-    }
+    memcpy(dest, envstr, len * sizeof(WCHAR));
     FreeEnvironmentStringsW(envstr);
     return newenv;
 cleanup:
@@ -112,9 +101,10 @@ static WCHAR *get_working_directory(const WCHAR *exe_path) {
 
 static BOOL read(HANDLE h, void *buf, DWORD sz)
 {
-    for (DWORD read; sz > 0; buf += read, sz -= read)
+    char *b = buf;
+    for (DWORD read; sz > 0; b += read, sz -= read)
     {
-        if (!ReadFile(h, buf, sz, &read, NULL))
+        if (!ReadFile(h, b, sz, &read, NULL))
         {
             return FALSE;
         }
@@ -124,8 +114,9 @@ static BOOL read(HANDLE h, void *buf, DWORD sz)
 
 static BOOL write(HANDLE h, const void *buf, DWORD sz)
 {
-    for (DWORD written; sz > 0; buf += written, sz -= written) {
-        if (!WriteFile(h, buf, sz, &written, NULL))
+    char *b = (void*)buf;
+    for (DWORD written; sz > 0; b += written, sz -= written) {
+        if (!WriteFile(h, b, sz, &written, NULL))
         {
             return FALSE;
         }
@@ -259,14 +250,14 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
     if (!path) {
         goto cleanup;
     }
-    StringCchPrintfW(path, pathlen, L"%s", exe_path);
+    wsprintfW(path, L"%s", exe_path);
 
     dir = get_working_directory(exe_path);
     if (!dir) {
         goto cleanup;
     }
 
-    PROCESS_INFORMATION pi = {INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE};
+    PROCESS_INFORMATION pi = {INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, 0};
     STARTUPINFOW si = {0};
     si.cb = sizeof(STARTUPINFOW);
     si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;

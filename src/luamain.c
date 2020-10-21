@@ -1,8 +1,9 @@
-#include <lua.h>
-#include <lauxlib.h>
+#include <lua5.1/lua.h>
+#include <lua5.1/lauxlib.h>
 #include <windows.h>
 
 #include "bridge_public.h"
+#include "ods.h"
 
 HMODULE g_auf = NULL;
 struct bridge *g_bridge_api = NULL;
@@ -39,7 +40,9 @@ static int bridge_call(lua_State *L)
                 return luaL_error(L, "could not found bridge.auf");
             }
         }
-        struct bridge *__stdcall (*GetBridgeAPI)(void) = (void *)GetProcAddress(g_auf, "GetBridgeAPI");
+        typedef struct bridge*(__stdcall *GBAPI)(void);
+        GBAPI GetBridgeAPI = (GBAPI)GetProcAddress(g_auf, "GetBridgeAPI");
+        //struct bridge*(__stdcall *GetBridgeAPI)(void) = (void*)GetProcAddress(g_auf, "GetBridgeAPI");
         if (!GetBridgeAPI)
         {
             return luaL_error(L, "could not found GetBridgeAPI function in bridge.auf");
@@ -124,10 +127,11 @@ EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L)
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
+    (void)hinstDLL;
+    (void)lpvReserved;
     switch (fdwReason)
     {
     case DLL_PROCESS_ATTACH:
-        DisableThreadLibraryCalls(hinstDLL);
         break;
 
     case DLL_PROCESS_DETACH:

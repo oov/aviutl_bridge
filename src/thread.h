@@ -580,8 +580,6 @@ struct thread_queue_t
 
 #if defined( _WIN32 )
 
-    #pragma comment( lib, "winmm.lib" )
-
     #define _CRT_NONSTDC_NO_DEPRECATE 
     #define _CRT_SECURE_NO_WARNINGS
 
@@ -591,11 +589,7 @@ struct thread_queue_t
     #endif
 
     #define _WINSOCKAPI_
-    #pragma warning( push )
-    #pragma warning( disable: 4668 ) // 'symbol' is not defined as a preprocessor macro, replacing with '0' for 'directives'
-    #pragma warning( disable: 4255 )
     #include <windows.h>
-    #pragma warning( pop )
 
     // To set thread name
     const DWORD MS_VC_EXCEPTION = 0x406D1388;
@@ -675,6 +669,7 @@ void thread_exit( int return_code )
 thread_ptr_t thread_create( int (*thread_proc)( void* ), void* user_data, char const* name, int stack_size )
     {
     #if defined( _WIN32 )
+        (void)name;
 
         DWORD thread_id;
         HANDLE handle = CreateThread( NULL, stack_size > 0 ? (size_t)stack_size : 0U, 
@@ -782,10 +777,7 @@ void thread_mutex_init( thread_mutex_t* mutex )
     #if defined( _WIN32 )
 
         // Compile-time size check
-        #pragma warning( push )
-        #pragma warning( disable: 4214 ) // nonstandard extension used: bit field types other than int
         struct x { char thread_mutex_type_too_small : ( sizeof( thread_mutex_t ) < sizeof( CRITICAL_SECTION ) ? 0 : 1 ); }; 
-        #pragma warning( pop )
 
         InitializeCriticalSectionAndSpinCount( (CRITICAL_SECTION*) mutex, 32 );
     
@@ -877,10 +869,7 @@ struct thread_internal_signal_t
 void thread_signal_init( thread_signal_t* signal )
     {
     // Compile-time size check
-    #pragma warning( push )
-    #pragma warning( disable: 4214 ) // nonstandard extension used: bit field types other than int
     struct x { char thread_signal_type_too_small : ( sizeof( thread_signal_t ) < sizeof( struct thread_internal_signal_t ) ? 0 : 1 ); };
-    #pragma warning( pop )
     
     struct thread_internal_signal_t* internal = (struct thread_internal_signal_t*) signal;
         
@@ -1166,12 +1155,7 @@ void thread_atomic_ptr_store( thread_atomic_ptr_t* atomic, void* desired )
     {
     #if defined( _WIN32 )
     
-        #pragma warning( push )
-        #pragma warning( disable: 4302 ) // 'type cast' : truncation from 'void *' to 'LONG'
-        #pragma warning( disable: 4311 ) // pointer truncation from 'void *' to 'LONG'
-        #pragma warning( disable: 4312 ) // conversion from 'LONG' to 'PVOID' of greater size
         InterlockedExchangePointer( &atomic->ptr, desired );
-        #pragma warning( pop )
 
     
     #elif defined( __linux__ ) || defined( __APPLE__ ) || defined( __ANDROID__ )
@@ -1189,12 +1173,7 @@ void* thread_atomic_ptr_swap( thread_atomic_ptr_t* atomic, void* desired )
     {
     #if defined( _WIN32 )
     
-        #pragma warning( push )
-        #pragma warning( disable: 4302 ) // 'type cast' : truncation from 'void *' to 'LONG'
-        #pragma warning( disable: 4311 ) // pointer truncation from 'void *' to 'LONG'
-        #pragma warning( disable: 4312 ) // conversion from 'LONG' to 'PVOID' of greater size
         return InterlockedExchangePointer( &atomic->ptr, desired );
-        #pragma warning( pop )
     
     #elif defined( __linux__ ) || defined( __APPLE__ ) || defined( __ANDROID__ )
 
@@ -1229,10 +1208,7 @@ void thread_timer_init( thread_timer_t* timer )
     #if defined( _WIN32 )
 
         // Compile-time size check
-        #pragma warning( push )
-        #pragma warning( disable: 4214 ) // nonstandard extension used: bit field types other than int
         struct x { char thread_timer_type_too_small : ( sizeof( thread_mutex_t ) < sizeof( HANDLE ) ? 0 : 1 ); }; 
-        #pragma warning( pop )
 
         TIMECAPS tc;
         if( timeGetDevCaps( &tc, sizeof( TIMECAPS ) ) == TIMERR_NOERROR ) 

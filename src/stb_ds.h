@@ -739,6 +739,7 @@ void stbds_rand_seed(size_t seed)
 
 static size_t stbds_probe_position(size_t hash, size_t slot_count, size_t slot_log2)
 {
+  (void)slot_log2;
   size_t pos;
   pos = hash & (slot_count-1);
   #ifdef STBDS_INTERNAL_BUCKET_START
@@ -1081,6 +1082,7 @@ static int stbds_is_key_equal(void *a, size_t elemsize, void *key, size_t keysiz
  
 void stbds_hmfree_func(void *a, size_t elemsize, size_t keyoff)
 {
+  (void)keyoff;
   if (a == NULL) return;
   if (stbds_hash_table(a) != NULL) {
      if (stbds_hash_table(a)->string.mode == STBDS_SH_STRDUP) {

@@ -8,11 +8,8 @@
 #include "ver.h"
 #include "ods.h"
 
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h>
-#include <strsafe.h>
 
 struct process_map
 {
@@ -29,7 +26,7 @@ thread_mutex_t g_mutex;
 
 static BOOL bridge_init(FILTER *fp)
 {
-    StringCbPrintfW(g_mapped_file_name, 32, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
+    wsprintfW(g_mapped_file_name, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
     stbds_sh_new_arena(g_process_map);
     thread_mutex_init(&g_mutex);
 
@@ -74,6 +71,7 @@ static BOOL bridge_init(FILTER *fp)
 
 static BOOL bridge_exit(FILTER *fp)
 {
+    (void)fp;
     thread_mutex_lock(&g_mutex);
     if (g_process_map)
     {
@@ -145,7 +143,7 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
         v->height = mem->height;
         if (mem->mode & MEM_MODE_READ)
         {
-            memcpy_s(v + 1, v->body_size, mem->buf, mem->width * 4 * mem->height);
+            memcpy(v + 1, mem->buf, mem->width * 4 * mem->height);
         }
     }
     if (process_write(p, buf, len) != 0)
@@ -161,7 +159,7 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
     if (mem && mem->mode & MEM_MODE_WRITE)
     {
         struct share_mem_header *v = g_view;
-        memcpy_s(mem->buf, mem->width * 4 * mem->height, v + 1, mem->width * 4 * mem->height);
+        memcpy(mem->buf, v + 1, mem->width * 4 * mem->height);
     }
     *r = rbuf;
     *rlen = rbuflen;
@@ -202,6 +200,16 @@ FILTER_DLL bridge_filter = {
     BRIDGE_NAME " " VERSION,
     NULL,
     NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    {0, 0},
 };
 
 struct bridge bridge_api = {0, bridge_call};

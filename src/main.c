@@ -21,10 +21,11 @@ EXTERN_C struct bridge __declspec(dllexport) * __stdcall GetBridgeAPI(void)
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
+    (void)hinstDLL;
+    (void)lpvReserved;
     switch (fdwReason)
     {
     case DLL_PROCESS_ATTACH:
-        DisableThreadLibraryCalls(hinstDLL);
         break;
 
     case DLL_PROCESS_DETACH:

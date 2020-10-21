@@ -1,9 +1,6 @@
 #include "ods.h"
 
-#include <stdio.h>
 #include <stdarg.h>
-#include <string.h>
-
 #include <windows.h>
 
 void ODS(const char *fmt, ...)
@@ -12,9 +9,9 @@ void ODS(const char *fmt, ...)
     va_list p;
     va_start(p, fmt);
     f[0] = '\0';
-    strcat_s(f, 1024, "bridge: ");
-    strcat_s(f, 1024, fmt);
-    vsprintf_s(s, 1024, f, p);
+    lstrcatA(f, "bridge: ");
+    lstrcatA(f, fmt);
+    wsprintfA(s, f, p);
     OutputDebugStringA(s);
     va_end(p);
 }

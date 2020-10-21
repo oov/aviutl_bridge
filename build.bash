@@ -15,4 +15,9 @@ cat << EOS | sed 's/\r$//' | sed 's/$/\r/' > 'src/ver.h'
 EOS
 
 # build
-PATH=$(wslpath "C:\Program Files (x86)\mingw-w64\i686-8.1.0-win32-dwarf-rt_v6-rev0\mingw32\bin") WSLENV=PATH/lw mingw32-make.exe
+# pacman -S mingw-w64-i686-gcc
+# pacman -S mingw-w64-i686-clang
+# pacman -S mingw-w64-i686-make
+# pacman -S mingw-w64-i686-lua51
+PATH=$(wslpath "C:\msys64\mingw32\bin") WSLENV=PATH/lw mingw32-make.exe
+
