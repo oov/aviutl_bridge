@@ -21,7 +21,7 @@ obj/luamain.o: src/luamain.c
 	$(CC) $(CFLAGS) -o obj/luamain.o -c src/luamain.c
 
 src/bridge.c: src/ver.h
-src/main.c: src/bridge_public.h src/aviutl.h src/aviutl_sdk/filter.h src/thread.h src/stb_ds.h
+src/main.c: src/bridge_public.h src/aviutl.h src/aviutl_sdk/filter.h src/threads/threads.h src/stb_ds.h
 src/luamain.c: src/bridge_public.h
 
 .PHONY: clean

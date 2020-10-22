@@ -1,8 +1,120 @@
 #include "process.h"
 
-#include "thread.h"
+#include "threads/threads.h"
 #include <windows.h>
 #include <stdint.h>
+
+struct queue
+{
+    mtx_t mtx;
+    cnd_t cnd, cnd2;
+    void **items;
+    int num_items, used;
+    int readcur, writecur;
+};
+
+static struct queue *queue_init(void **items, int num_items)
+{
+    int mtx_ret = thrd_error;
+    int cnd_ret = thrd_error;
+    int cnd2_ret = thrd_error;
+    struct queue *const q = malloc(sizeof(struct queue));
+    if (!q)
+    {
+        return NULL;
+    }
+    q->items = items;
+    q->num_items = num_items;
+    q->used = 0;
+    q->readcur = 0;
+    q->writecur = 0;
+    mtx_ret = mtx_init(&q->mtx, mtx_plain | mtx_recursive);
+    if (mtx_ret != thrd_success)
+    {
+        goto cleanup;
+    }
+    cnd_ret = cnd_init(&q->cnd);
+    if (cnd_ret != thrd_success)
+    {
+        goto cleanup;
+    }
+    cnd2_ret = cnd_init(&q->cnd2);
+    if (cnd2_ret != thrd_success)
+    {
+        goto cleanup;
+    }
+    return q;
+cleanup:
+    if (cnd2_ret == thrd_success)
+    {
+        cnd_destroy(&q->cnd2);
+    }
+    if (cnd_ret == thrd_success)
+    {
+        cnd_destroy(&q->cnd);
+    }
+    if (mtx_ret == thrd_success)
+    {
+        mtx_destroy(&q->mtx);
+    }
+    free(q);
+    return NULL;
+}
+
+void queue_destroy(struct queue *const q)
+{
+    cnd_destroy(&q->cnd2);
+    cnd_destroy(&q->cnd);
+    mtx_destroy(&q->mtx);
+    free(q);
+}
+
+void queue_push(struct queue *const q, void *item)
+{
+    mtx_lock(&q->mtx);
+    while (q->used == q->num_items)
+    {
+        cnd_wait(&q->cnd2, &q->mtx);
+    }
+    q->items[q->writecur] = item;
+    ++q->used;
+    q->writecur = (q->writecur + 1) % q->num_items;
+    cnd_signal(&q->cnd);
+    mtx_unlock(&q->mtx);
+}
+
+void *queue_pop(struct queue *const q)
+{
+    void *r = NULL;
+    mtx_lock(&q->mtx);
+    while (q->used == 0)
+    {
+        cnd_wait(&q->cnd, &q->mtx);
+    }
+    r = q->items[q->readcur];
+    q->items[q->readcur] = NULL;
+    --q->used;
+    q->readcur = (q->readcur + 1) % q->num_items;
+    cnd_signal(&q->cnd2);
+    mtx_unlock(&q->mtx);
+    return r;
+}
+
+void *queue_pop_nowait(struct queue *const q)
+{
+    void *r = NULL;
+    mtx_lock(&q->mtx);
+    if (q->used > 0)
+    {
+        r = q->items[q->readcur];
+        q->items[q->readcur] = NULL;
+        --q->used;
+        q->readcur = (q->readcur + 1) % q->num_items;
+        cnd_signal(&q->cnd2);
+    }
+    mtx_unlock(&q->mtx);
+    return r;
+}
 
 struct queue_item
 {
@@ -13,9 +125,9 @@ struct queue_item
 struct process
 {
     HANDLE process;
-    thread_ptr_t thread;
-    thread_queue_t queue;
-    struct queue_item queue_items[2];
+    thrd_t thread;
+    struct queue *q;
+    struct queue_item *queue_items[2];
     void *previous_queue_item;
     HANDLE in_w;
     HANDLE out_r;
@@ -141,7 +253,7 @@ static int read_worker(void *userdata)
         {
             goto error;
         }
-        thread_queue_produce(&self->queue, qi, 60000);
+        queue_push(self->q, qi);
     }
     return 0;
 
@@ -150,7 +262,7 @@ static int read_worker(void *userdata)
         struct queue_item *qi = malloc(sizeof(struct queue_item));
         qi->buf = NULL;
         qi->len = 0;
-        thread_queue_produce(&self->queue, qi, 60000);
+        queue_push(self->q, qi);
     }
     return 1;
 }
@@ -169,7 +281,7 @@ int process_write(struct process *self, const void *buf, size_t len)
 
 int process_read(struct process *self, void **buf, size_t *len)
 {
-    struct queue_item *qi = thread_queue_consume(&self->queue, 60000);
+    struct queue_item *qi = queue_pop(self->q);
     if (!qi)
     {
         return 1;
@@ -296,17 +408,22 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
     r->out_r = out_r;
     r->err_r = err_r;
 
-    thread_queue_init(&r->queue, 2, (void **)r->queue_items, 0);
-
-    thread_ptr_t thread = thread_create(read_worker, r, NULL, THREAD_STACK_SIZE_DEFAULT);
-    if (!thread)
+    r->q = queue_init((void**)r->queue_items, 2);
+    if (!r->q)
     {
         CloseHandle(pi.hProcess);
         pi.hProcess = INVALID_HANDLE_VALUE;
         free(r);
         goto cleanup;
     }
-    r->thread = thread;
+    if (thrd_create(&r->thread, read_worker, r) != thrd_success)
+    {
+        CloseHandle(pi.hProcess);
+        pi.hProcess = INVALID_HANDLE_VALUE;
+        queue_destroy(r->q);
+        free(r);
+        goto cleanup;
+    }
     return r;
 
 cleanup:
@@ -404,17 +521,18 @@ void process_finish(struct process *self)
         CloseHandle(self->process);
         self->process = INVALID_HANDLE_VALUE;
     }
-    thread_join(self->thread);
+    void *qi = NULL;
+    while ((qi = queue_pop_nowait(self->q)))
+    {
+        free(qi);
+    }
+    thrd_join(self->thread, NULL);
     if (self->previous_queue_item)
     {
         free(self->previous_queue_item);
         self->previous_queue_item = NULL;
     }
-    while (thread_queue_count(&self->queue))
-    {
-        free(thread_queue_consume(&self->queue, THREAD_QUEUE_WAIT_INFINITE));
-    }
-    thread_queue_term(&self->queue);
+    queue_destroy(self->q);
     free(self);
 }
 

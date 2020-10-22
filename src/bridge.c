@@ -2,7 +2,7 @@
 
 #define STBDS_NO_SHORT_NAMES
 #include "stb_ds.h"
-#include "thread.h"
+#include "threads/threads.h"
 
 #include "process.h"
 #include "ver.h"
@@ -22,13 +22,13 @@ HANDLE g_mapped_file = NULL;
 int g_bufsize = 0;
 void *g_view = NULL;
 struct process_map *g_process_map = NULL;
-thread_mutex_t g_mutex;
+mtx_t g_mutex;
 
 static BOOL bridge_init(FILTER *fp)
 {
     wsprintfW(g_mapped_file_name, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
     stbds_sh_new_arena(g_process_map);
-    thread_mutex_init(&g_mutex);
+    mtx_init(&g_mutex, mtx_plain|mtx_recursive);
 
     SYS_INFO si;
     if (!fp->exfunc->get_sys_info(NULL, &si))
@@ -72,7 +72,7 @@ static BOOL bridge_init(FILTER *fp)
 static BOOL bridge_exit(FILTER *fp)
 {
     (void)fp;
-    thread_mutex_lock(&g_mutex);
+    mtx_lock(&g_mutex);
     if (g_process_map)
     {
         for (int i = 0; i < stbds_shlen(g_process_map); ++i)
@@ -93,7 +93,7 @@ static BOOL bridge_exit(FILTER *fp)
         CloseHandle(g_mapped_file);
         g_mapped_file = NULL;
     }
-    thread_mutex_term(&g_mutex);
+    mtx_destroy(&g_mutex);
     return TRUE;
 }
 
@@ -168,9 +168,9 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
 
 static int bridge_call(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
 {
-    thread_mutex_lock(&g_mutex);
+    mtx_lock(&g_mutex);
     int ret = bridge_call_core(exe_path, buf, len, mem, r, rlen);
-    thread_mutex_unlock(&g_mutex);
+    mtx_unlock(&g_mutex);
     return ret;
 }
 
