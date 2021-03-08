@@ -4,8 +4,6 @@
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
-#define THREAD_IMPLEMENTATION
-#include "thread.h"
 
 FILTER_DLL *filter_list[] = {&bridge_filter, NULL};
 
