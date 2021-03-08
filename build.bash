@@ -28,7 +28,7 @@ EOS
 mkdir -p build
 rm -rf build/*
 cd build
-CC=clang cmake.exe -GNinja -DCMAKE_BUILD_TYPE=Release ..
+CC=clang cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
 ninja
 cd ..
 
