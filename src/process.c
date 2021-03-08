@@ -201,7 +201,7 @@ static WCHAR *get_working_directory(const WCHAR *exe_path) {
     }
     WCHAR *dir = calloc(dirlen, sizeof(WCHAR));
     WCHAR *fn = NULL;
-    if (GetFullPathNameW(path, dirlen, dir, &fn) == 0) {
+    if (GetFullPathNameW(path, dirlen, dir, &fn) == 0 || fn == NULL) {
         free(dir);
         free(path);
         return NULL;
