@@ -15,9 +15,23 @@ cat << EOS | sed 's/\r$//' | sed 's/$/\r/' > 'src/ver.h'
 EOS
 
 # build
-# pacman -S mingw-w64-i686-gcc
-# pacman -S mingw-w64-i686-clang
-# pacman -S mingw-w64-i686-make
-# pacman -S mingw-w64-i686-lua51
-PATH=$(wslpath "C:\msys64\mingw32\bin") WSLENV=PATH/lw mingw32-make.exe
+# using packages:
+#   pacman -S mingw-w64-i686-ninja
+#   pacman -S mingw-w64-i686-clang
+#   pacman -S mingw-w64-i686-cmake
+#   pacman -S mingw-w64-i686-lua51
+# mkdir build
+# cd build
+# CC=clang cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
+# ninja
 
+mkdir -p build
+rm -rf build/*
+cd build
+PATH=$(wslpath "C:\msys64\mingw32\bin") WSLENV=PATH/lw CC=clang cmake.exe -GNinja -DCMAKE_BUILD_TYPE=Release ..
+PATH=$(wslpath "C:\msys64\mingw32\bin") WSLENV=PATH/lw CC=clang ninja.exe
+cd ..
+
+rm -rf bin/bridge.auf bin/script/bridge.dll
+cp build/src/bridge.auf bin/bridge.auf
+cp build/src/bridge.dll bin/script/bridge.dll

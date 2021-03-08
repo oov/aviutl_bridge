@@ -3,6 +3,7 @@ lua-5.1.5/
 src/ver.h
 obj/
 bin/
+build/
 VERSION
 *.o
 *.exe
