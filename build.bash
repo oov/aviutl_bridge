@@ -28,8 +28,8 @@ EOS
 mkdir -p build
 rm -rf build/*
 cd build
-PATH=$(wslpath "C:\msys64\mingw32\bin") WSLENV=PATH/lw CC=clang cmake.exe -GNinja -DCMAKE_BUILD_TYPE=Release ..
-PATH=$(wslpath "C:\msys64\mingw32\bin") WSLENV=PATH/lw CC=clang ninja.exe
+CC=clang cmake.exe -GNinja -DCMAKE_BUILD_TYPE=Release ..
+ninja
 cd ..
 
 rm -rf bin/bridge.auf bin/script/bridge.dll
