@@ -35,3 +35,7 @@ cd ..
 rm -rf bin/bridge.auf bin/script/bridge.dll
 cp build/src/bridge.auf bin/bridge.auf
 cp build/src/bridge.dll bin/script/bridge.dll
+
+cd bin
+zip aviutl_bridge_${VERSION}.zip bridge.auf bridge.txt script/bridge.dll
+cd ..
