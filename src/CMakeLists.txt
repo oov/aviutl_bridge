@@ -35,6 +35,7 @@ if (("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU") OR
     )
     target_link_options(${target} PRIVATE
         $<$<CONFIG:Release>:-s>
+        -Wl,--kill-at
     )
 
 elseif("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
