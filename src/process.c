@@ -247,11 +247,16 @@ static int read_worker(void *userdata)
             goto error;
         }
         struct queue_item *qi = malloc(sizeof(struct queue_item) + sz);
-        qi->buf = qi + 1;
         qi->len = sz;
-        if (!read(self->out_r, qi->buf, sz))
-        {
+        if (sz) {
+          qi->buf = qi + 1;
+          if (!read(self->out_r, qi->buf, sz))
+          {
+            free(qi);
             goto error;
+          }
+        } else {
+          qi->buf = NULL;
         }
         queue_push(self->q, qi);
     }
@@ -261,7 +266,7 @@ static int read_worker(void *userdata)
     {
         struct queue_item *qi = malloc(sizeof(struct queue_item));
         qi->buf = NULL;
-        qi->len = 0;
+        qi->len = -1;
         queue_push(self->q, qi);
     }
     return 1;
@@ -291,7 +296,7 @@ int process_read(struct process *self, void **buf, size_t *len)
         free(self->previous_queue_item);
     }
     self->previous_queue_item = qi;
-    if (qi->buf == NULL || qi->len == 0) {
+    if (qi->buf == NULL && qi->len == -1) {
         return 2;
     }
     *buf = qi->buf;

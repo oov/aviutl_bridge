@@ -117,8 +117,8 @@ static int bridge_call(lua_State *L)
         }
     }
 
-    int32_t rlen;
-    void *r;
+    int32_t rlen = 0;
+    void *r = NULL;
     int err = g_bridge_api->call(exe_path, buf, buflen, NULL, &r, &rlen);
     if (err != ECALL_OK)
     {
