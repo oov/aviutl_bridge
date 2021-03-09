@@ -97,11 +97,12 @@ int main(){
         }
 
         // require("bridge").call("C:\\your\\binary.exe", "send data", "rw");
-        // Lua 側で上記のように call の第三引数に "r" や "w" や "rw" を付けると、
+        // Lua 側で上記のように call の第三引数に "r" や "w" や "rw" や "rwp" などを付けると、
         // obj.getpixeldata / obj.putpixeldata を利用したピクセルデータのやり取りができる
         //   r  - 読み取りのみ、拡張編集から外部exe(これ)にピクセルデータを渡す
         //   w  - 書き込みのみ、外部exe(これ)から拡張編集にピクセルデータを反映
-        //   rw - 読み書き、渡されてきた画像を書き換えて反映させたい場合はこれ
+        //   p  - obj.getpixeldata や obj.putpixeldata を内部で呼び出さずに、
+        //        第四引数以降に「画像データ」「幅」「高さ」を直接渡すことで処理を行う
         {
             // ピクセルデータは FileMappingObject にあり、環境変数を参照すると名前が取れる
             char fmo_name[32];

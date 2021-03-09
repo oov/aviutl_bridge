@@ -25,6 +25,7 @@ enum mem_mode
 {
     MEM_MODE_READ = 1,
     MEM_MODE_WRITE = 2,
+    MEM_MODE_DIRECT = 4,
 };
 
 struct call_mem

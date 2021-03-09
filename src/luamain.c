@@ -67,24 +67,38 @@ static int bridge_call(lua_State *L)
         size_t mflen;
         const char *mf = lua_tolstring(L, 3, &mflen);
         int32_t mode = 0;
-        if ((mflen > 0 && mf[0] == 'r') || (mflen > 1 && mf[1] == 'r'))
-        {
-            mode |= MEM_MODE_READ;
+        for (size_t i = 0; i < mflen; ++i) {
+          switch (mf[i]) {
+            case 'r': case 'R':
+              mode |= MEM_MODE_READ;
+              break;
+            case 'w': case 'W':
+              mode |= MEM_MODE_WRITE;
+              break;
+            case 'p': case 'P':
+              mode |= MEM_MODE_DIRECT;
+              break;
+          }
         }
-        if ((mflen > 0 && mf[0] == 'w') || (mflen > 1 && mf[1] == 'w'))
-        {
-            mode |= MEM_MODE_WRITE;
-        }
-        if (mode) {
+        if (mode & (MEM_MODE_READ|MEM_MODE_WRITE)) {
             struct call_mem m;
-            lua_getglobal(L, "obj");
-            lua_getfield(L, -1, "getpixeldata");
-            lua_call(L, 0, 3);
-            m.buf = (void *)lua_topointer(L, -3);
-            m.width = lua_tointeger(L, -2);
-            m.height = lua_tointeger(L, -1);
             m.mode = mode;
-            lua_pop(L, 2);
+            if (mode & MEM_MODE_DIRECT) {
+              m.buf = (void *)lua_topointer(L, 4);
+              m.width = lua_tointeger(L, 5);
+              m.height = lua_tointeger(L, 6);
+              if (!m.buf || m.width == 0 || m.height == 0) {
+                return luaL_error(L, "invalid arguments");
+              }
+            } else {
+              lua_getglobal(L, "obj");
+              lua_getfield(L, -1, "getpixeldata");
+              lua_call(L, 0, 3);
+              m.buf = (void *)lua_topointer(L, -3);
+              m.width = lua_tointeger(L, -2);
+              m.height = lua_tointeger(L, -1);
+              lua_pop(L, 2);
+            }
             int32_t rlen;
             void *r;
             int err = g_bridge_api->call(exe_path, buf, buflen, &m, &r, &rlen);
@@ -92,7 +106,7 @@ static int bridge_call(lua_State *L)
             {
                 return bridge_call_error(L, err);
             }
-            if (m.mode & MEM_MODE_WRITE)
+            if (m.mode & MEM_MODE_WRITE && !(m.mode & MEM_MODE_DIRECT))
             {
                 lua_getfield(L, -2, "putpixeldata");
                 lua_pushvalue(L, -2);
