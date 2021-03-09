@@ -37,5 +37,5 @@ cp build/src/bridge.auf bin/bridge.auf
 cp build/src/bridge.dll bin/script/bridge.dll
 
 cd bin
-zip aviutl_bridge_${VERSION}.zip bridge.auf bridge.txt script/bridge.dll
+zip aviutl_bridge_wip.zip bridge.auf bridge.txt script/bridge.dll
 cd ..
