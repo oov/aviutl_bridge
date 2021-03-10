@@ -10,122 +10,132 @@ struct bridge *g_bridge_api = NULL;
 
 static int bridge_call_error(lua_State *L, int err)
 {
-    switch (err)
-    {
-    case ECALL_OK:
-        return luaL_error(L, "success");
-    case ECALL_NOT_INITIALIZED:
-        return luaL_error(L, "bridge library is not initialized yet");
-    case ECALL_FAILED_TO_CONVERT_EXE_PATH:
-        return luaL_error(L, "failed to convert exe path");
-    case ECALL_FAILED_TO_START_PROCESS:
-        return luaL_error(L, "failed to start new process");
-    case ECALL_FAILED_TO_SEND_COMMAND:
-        return luaL_error(L, "could not send command to child process");
-    case ECALL_FAILED_TO_RECEIVE_COMMAND:
-        return luaL_error(L, "could not receive reply from child process");
-    }
-    return luaL_error(L, "unexpected error code");
+  switch (err)
+  {
+  case ECALL_OK:
+    return luaL_error(L, "success");
+  case ECALL_NOT_INITIALIZED:
+    return luaL_error(L, "bridge library is not initialized yet");
+  case ECALL_FAILED_TO_CONVERT_EXE_PATH:
+    return luaL_error(L, "failed to convert exe path");
+  case ECALL_FAILED_TO_START_PROCESS:
+    return luaL_error(L, "failed to start new process");
+  case ECALL_FAILED_TO_SEND_COMMAND:
+    return luaL_error(L, "could not send command to child process");
+  case ECALL_FAILED_TO_RECEIVE_COMMAND:
+    return luaL_error(L, "could not receive reply from child process");
+  }
+  return luaL_error(L, "unexpected error code");
 }
 
 static int bridge_call(lua_State *L)
 {
+  if (!g_bridge_api)
+  {
+    if (!g_auf)
+    {
+      g_auf = LoadLibrary("bridge.auf");
+      if (!g_auf)
+      {
+        return luaL_error(L, "could not found bridge.auf");
+      }
+    }
+    typedef struct bridge *(__stdcall * GBAPI)(void);
+    GBAPI GetBridgeAPI = (GBAPI)GetProcAddress(g_auf, "GetBridgeAPI");
+    //struct bridge*(__stdcall *GetBridgeAPI)(void) = (void*)GetProcAddress(g_auf, "GetBridgeAPI");
+    if (!GetBridgeAPI)
+    {
+      return luaL_error(L, "could not found GetBridgeAPI function in bridge.auf");
+    }
+    g_bridge_api = GetBridgeAPI();
     if (!g_bridge_api)
     {
-        if (!g_auf)
-        {
-            g_auf = LoadLibrary("bridge.auf");
-            if (!g_auf)
-            {
-                return luaL_error(L, "could not found bridge.auf");
-            }
-        }
-        typedef struct bridge*(__stdcall *GBAPI)(void);
-        GBAPI GetBridgeAPI = (GBAPI)GetProcAddress(g_auf, "GetBridgeAPI");
-        //struct bridge*(__stdcall *GetBridgeAPI)(void) = (void*)GetProcAddress(g_auf, "GetBridgeAPI");
-        if (!GetBridgeAPI)
-        {
-            return luaL_error(L, "could not found GetBridgeAPI function in bridge.auf");
-        }
-        g_bridge_api = GetBridgeAPI();
-        if (!g_bridge_api)
-        {
-            return luaL_error(L, "could not access BridgeAPI");
-        }
+      return luaL_error(L, "could not access BridgeAPI");
     }
+  }
 
-    const char *exe_path = lua_tostring(L, 1);
-    if (!exe_path)
+  const char *exe_path = lua_tostring(L, 1);
+  if (!exe_path)
+  {
+    return luaL_error(L, "invalid exe path");
+  }
+  size_t buflen;
+  const char *buf = lua_tolstring(L, 2, &buflen);
+
+  if (lua_isstring(L, 3))
+  {
+    size_t mflen;
+    const char *mf = lua_tolstring(L, 3, &mflen);
+    int32_t mode = 0;
+    for (size_t i = 0; i < mflen; ++i)
     {
-        return luaL_error(L, "invalid exe path");
+      switch (mf[i])
+      {
+      case 'r':
+      case 'R':
+        mode |= MEM_MODE_READ;
+        break;
+      case 'w':
+      case 'W':
+        mode |= MEM_MODE_WRITE;
+        break;
+      case 'p':
+      case 'P':
+        mode |= MEM_MODE_DIRECT;
+        break;
+      }
     }
-    size_t buflen;
-    const char *buf = lua_tolstring(L, 2, &buflen);
-
-    if (lua_isstring(L, 3))
+    if (mode & (MEM_MODE_READ | MEM_MODE_WRITE))
     {
-        size_t mflen;
-        const char *mf = lua_tolstring(L, 3, &mflen);
-        int32_t mode = 0;
-        for (size_t i = 0; i < mflen; ++i) {
-          switch (mf[i]) {
-            case 'r': case 'R':
-              mode |= MEM_MODE_READ;
-              break;
-            case 'w': case 'W':
-              mode |= MEM_MODE_WRITE;
-              break;
-            case 'p': case 'P':
-              mode |= MEM_MODE_DIRECT;
-              break;
-          }
+      struct call_mem m;
+      m.mode = mode;
+      if (mode & MEM_MODE_DIRECT)
+      {
+        m.buf = (void *)lua_topointer(L, 4);
+        m.width = lua_tointeger(L, 5);
+        m.height = lua_tointeger(L, 6);
+        if (!m.buf || m.width == 0 || m.height == 0)
+        {
+          return luaL_error(L, "invalid arguments");
         }
-        if (mode & (MEM_MODE_READ|MEM_MODE_WRITE)) {
-            struct call_mem m;
-            m.mode = mode;
-            if (mode & MEM_MODE_DIRECT) {
-              m.buf = (void *)lua_topointer(L, 4);
-              m.width = lua_tointeger(L, 5);
-              m.height = lua_tointeger(L, 6);
-              if (!m.buf || m.width == 0 || m.height == 0) {
-                return luaL_error(L, "invalid arguments");
-              }
-            } else {
-              lua_getglobal(L, "obj");
-              lua_getfield(L, -1, "getpixeldata");
-              lua_call(L, 0, 3);
-              m.buf = (void *)lua_topointer(L, -3);
-              m.width = lua_tointeger(L, -2);
-              m.height = lua_tointeger(L, -1);
-              lua_pop(L, 2);
-            }
-            int32_t rlen;
-            void *r;
-            int err = g_bridge_api->call(exe_path, buf, buflen, &m, &r, &rlen);
-            if (err != ECALL_OK)
-            {
-                return bridge_call_error(L, err);
-            }
-            if (m.mode & MEM_MODE_WRITE && !(m.mode & MEM_MODE_DIRECT))
-            {
-                lua_getfield(L, -2, "putpixeldata");
-                lua_pushvalue(L, -2);
-                lua_call(L, 1, 0);
-            }
-            lua_pushlstring(L, r, rlen);
-            return 1;
-        }
-    }
-
-    int32_t rlen = 0;
-    void *r = NULL;
-    int err = g_bridge_api->call(exe_path, buf, buflen, NULL, &r, &rlen);
-    if (err != ECALL_OK)
-    {
+      }
+      else
+      {
+        lua_getglobal(L, "obj");
+        lua_getfield(L, -1, "getpixeldata");
+        lua_call(L, 0, 3);
+        m.buf = (void *)lua_topointer(L, -3);
+        m.width = lua_tointeger(L, -2);
+        m.height = lua_tointeger(L, -1);
+        lua_pop(L, 2);
+      }
+      int32_t rlen;
+      void *r;
+      int err = g_bridge_api->call(exe_path, buf, buflen, &m, &r, &rlen);
+      if (err != ECALL_OK)
+      {
         return bridge_call_error(L, err);
+      }
+      if (m.mode & MEM_MODE_WRITE && !(m.mode & MEM_MODE_DIRECT))
+      {
+        lua_getfield(L, -2, "putpixeldata");
+        lua_pushvalue(L, -2);
+        lua_call(L, 1, 0);
+      }
+      lua_pushlstring(L, r, rlen);
+      return 1;
     }
-    lua_pushlstring(L, r, rlen);
-    return 1;
+  }
+
+  int32_t rlen = 0;
+  void *r = NULL;
+  int err = g_bridge_api->call(exe_path, buf, buflen, NULL, &r, &rlen);
+  if (err != ECALL_OK)
+  {
+    return bridge_call_error(L, err);
+  }
+  lua_pushlstring(L, r, rlen);
+  return 1;
 }
 
 static uint64_t cyrb64(const uint32_t *src, const size_t len, const uint32_t seed)
@@ -157,7 +167,7 @@ static int bridge_calc_hash(lua_State *L)
   const int w = lua_tointeger(L, 2);
   const int h = lua_tointeger(L, 3);
   char b[16];
-  to_hex(b, cyrb64(p, w*h, 0x3fc0b49e));
+  to_hex(b, cyrb64(p, w * h, 0x3fc0b49e));
   lua_pushlstring(L, b, 16);
   return 1;
 }
@@ -170,33 +180,33 @@ static struct luaL_Reg fntable[] = {
 
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L)
 {
-    luaL_register(L, "bridge", fntable);
-    return 1;
+  luaL_register(L, "bridge", fntable);
+  return 1;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-    (void)hinstDLL;
-    (void)lpvReserved;
-    switch (fdwReason)
+  (void)hinstDLL;
+  (void)lpvReserved;
+  switch (fdwReason)
+  {
+  case DLL_PROCESS_ATTACH:
+    break;
+
+  case DLL_PROCESS_DETACH:
+    if (g_auf)
     {
-    case DLL_PROCESS_ATTACH:
-        break;
-
-    case DLL_PROCESS_DETACH:
-        if (g_auf)
-        {
-            FreeLibrary(g_auf);
-            g_auf = NULL;
-            g_bridge_api = NULL;
-        }
-        break;
-
-    case DLL_THREAD_ATTACH:
-        break;
-
-    case DLL_THREAD_DETACH:
-        break;
+      FreeLibrary(g_auf);
+      g_auf = NULL;
+      g_bridge_api = NULL;
     }
-    return TRUE;
+    break;
+
+  case DLL_THREAD_ATTACH:
+    break;
+
+  case DLL_THREAD_DETACH:
+    break;
+  }
+  return TRUE;
 }
