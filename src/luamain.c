@@ -128,8 +128,43 @@ static int bridge_call(lua_State *L)
     return 1;
 }
 
+static uint64_t cyrb64(const uint32_t *src, const size_t len, const uint32_t seed)
+{
+  uint32_t h1 = 0x91eb9dc7 ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (size_t i = 0; i < len; ++i)
+  {
+    h1 = (h1 ^ src[i]) * 2654435761;
+    h2 = (h2 ^ src[i]) * 1597334677;
+  }
+  h1 = ((h1 ^ (h1 >> 16)) * 2246822507) ^ ((h2 ^ (h2 >> 13)) * 3266489909);
+  h2 = ((h2 ^ (h2 >> 16)) * 2246822507) ^ ((h1 ^ (h1 >> 13)) * 3266489909);
+  return (((uint64_t)h2) << 32) | ((uint64_t)h1);
+}
+
+static void to_hex(char *dst, uint64_t x)
+{
+  const char *chars = "0123456789abcdef";
+  for (int i = 15; i >= 0; --i)
+  {
+    dst[i] = chars[x & 0xf];
+    x >>= 4;
+  }
+}
+
+static int bridge_calc_hash(lua_State *L)
+{
+  const void *p = lua_topointer(L, 1);
+  const int w = lua_tointeger(L, 2);
+  const int h = lua_tointeger(L, 3);
+  char b[16];
+  to_hex(b, cyrb64(p, w*h, 0x3fc0b49e));
+  lua_pushlstring(L, b, 16);
+  return 1;
+}
+
 static struct luaL_Reg fntable[] = {
     {"call", bridge_call},
+    {"calc_hash", bridge_calc_hash},
     {NULL, NULL},
 };
 
