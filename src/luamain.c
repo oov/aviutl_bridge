@@ -104,7 +104,8 @@ static int bridge_call(lua_State *L)
         lua_getglobal(L, "obj");
         lua_getfield(L, -1, "w");
         lua_getfield(L, -2, "h");
-        if (lua_tointeger(L, -1) == 0 || lua_tointeger(L, -2) == 0) {
+        if (lua_tointeger(L, -1) == 0 || lua_tointeger(L, -2) == 0)
+        {
           return luaL_error(L, "has no image");
         }
         lua_pop(L, 2);
@@ -172,10 +173,12 @@ static int bridge_calc_hash(lua_State *L)
   const void *p = lua_topointer(L, 1);
   const int w = lua_tointeger(L, 2);
   const int h = lua_tointeger(L, 3);
-  if (!p) {
+  if (!p)
+  {
     return luaL_error(L, "has no image");
   }
-  if (w <= 0 || h <= 0) {
+  if (w <= 0 || h <= 0)
+  {
     return luaL_error(L, "invalid arguments");
   }
   char b[16];
