@@ -1,7 +1,6 @@
 #include "bridge.h"
 
-#define STBDS_NO_SHORT_NAMES
-#include "stb_ds.h"
+#include "hashmap.h"
 #include "threads/threads.h"
 
 #include "process.h"
@@ -11,9 +10,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-struct process_map
+struct hash_map_value
 {
-  char *key;
   struct process *value;
 };
 
@@ -21,13 +19,15 @@ WCHAR g_mapped_file_name[32];
 HANDLE g_mapped_file = NULL;
 int g_bufsize = 0;
 void *g_view = NULL;
-struct process_map *g_process_map = NULL;
+struct hashmap_s g_process_map = { 0 };
 mtx_t g_mutex;
 
 static BOOL bridge_init(FILTER *fp)
 {
   wsprintfW(g_mapped_file_name, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
-  stbds_sh_new_arena(g_process_map);
+  if (hashmap_create(2, &g_process_map) != 0) {
+    return FALSE;
+  }
   mtx_init(&g_mutex, mtx_plain | mtx_recursive);
 
   SYS_INFO si;
@@ -69,20 +69,20 @@ static BOOL bridge_init(FILTER *fp)
   return TRUE;
 }
 
+static int delete_all_callback(void* const context, void* const value) {
+  (void)context;
+  struct hash_map_value *hmv = value;
+  process_finish(hmv->value);
+  free(value);
+  return 1;
+}
+
 static BOOL bridge_exit(FILTER *fp)
 {
   (void)fp;
   mtx_lock(&g_mutex);
-  if (g_process_map)
-  {
-    for (int i = 0; i < stbds_shlen(g_process_map); ++i)
-    {
-      process_finish(g_process_map[i].value);
-      g_process_map[i].value = NULL;
-    }
-    stbds_shfree(g_process_map);
-    g_process_map = NULL;
-  }
+  hashmap_iterate(&g_process_map, delete_all_callback, NULL);
+  hashmap_destroy(&g_process_map);
   if (g_view)
   {
     UnmapViewOfFile(g_view);
@@ -103,38 +103,53 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
   {
     return ECALL_NOT_INITIALIZED;
   }
-  struct process *p = stbds_shget(g_process_map, exe_path);
-  if (p)
+  const size_t exe_path_len = lstrlenA(exe_path);
+  struct hash_map_value *hmv = hashmap_get(&g_process_map, exe_path, exe_path_len);
+  if (hmv)
   {
-    if (!process_isrunning(p))
+    if (!process_isrunning(hmv->value))
     {
       // It seems process is already dead
-      process_finish(p);
-      p = NULL;
+      process_finish(hmv->value);
+      hashmap_remove(&g_process_map, exe_path, exe_path_len);
+      free(hmv);
+      hmv = NULL;
     }
   }
-  if (!p)
+  if (!hmv)
   {
-    int buflen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, lstrlenA(exe_path), NULL, 0) + 1;
-    WCHAR *wpath = calloc(buflen, sizeof(WCHAR));
+    hmv = malloc(sizeof(struct hash_map_value) + exe_path_len);
+    int buflen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, exe_path_len, NULL, 0);
+    WCHAR *wpath = malloc(sizeof(WCHAR) * (buflen+1));
     if (!wpath)
     {
+      free(hmv);
       return ECALL_FAILED_TO_CONVERT_EXE_PATH;
     }
-    if (MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, lstrlenA(exe_path), wpath, buflen) == 0)
+    if (MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, exe_path_len, wpath, buflen) == 0)
     {
+      free(hmv);
       free(wpath);
       return ECALL_FAILED_TO_CONVERT_EXE_PATH;
     }
-    p = process_start(wpath, L"BRIDGE_FMO", g_mapped_file_name);
+    wpath[buflen] = '\0';
+    struct process *p = process_start(wpath, L"BRIDGE_FMO", g_mapped_file_name);
     if (!p)
     {
+      free(hmv);
       free(wpath);
       return ECALL_FAILED_TO_START_PROCESS;
     }
     free(wpath);
     process_close_stderr(p);
-    stbds_shput(g_process_map, exe_path, p);
+    hmv->value = p;
+    char *key = (char*)(hmv + 1);
+    memcpy(key, exe_path, exe_path_len);
+    if (hashmap_put(&g_process_map, key, exe_path_len, hmv) != 0) {
+      process_finish(p);
+      free(hmv);
+      return ECALL_FAILED_TO_START_PROCESS;
+    }
   }
   if (mem)
   {
@@ -146,13 +161,13 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
       memcpy(v + 1, mem->buf, mem->width * 4 * mem->height);
     }
   }
-  if (process_write(p, buf, len) != 0)
+  if (process_write(hmv->value, buf, len) != 0)
   {
     return ECALL_FAILED_TO_SEND_COMMAND;
   }
   void *rbuf;
   size_t rbuflen;
-  if (process_read(p, &rbuf, &rbuflen) != 0)
+  if (process_read(hmv->value, &rbuf, &rbuflen) != 0)
   {
     return ECALL_FAILED_TO_RECEIVE_COMMAND;
   }

@@ -2,9 +2,6 @@
 #include "aviutl.h"
 #include "bridge.h"
 
-#define STB_DS_IMPLEMENTATION
-#include "stb_ds.h"
-
 FILTER_DLL *filter_list[] = {&bridge_filter, NULL};
 
 EXTERN_C FILTER_DLL __declspec(dllexport) * *__stdcall GetFilterTableList(void)
