@@ -547,12 +547,25 @@ void process_finish(struct process *self)
     CloseHandle(self->process);
     self->process = INVALID_HANDLE_VALUE;
   }
-  void *qi = NULL;
-  while ((qi = queue_pop_nowait(self->q)))
+
+  // FIXME: we cannot use thrd_join on DLL_PROCESS_DETACH bacause hangs.
+  // thrd_join(self->thread, NULL);
+  // struct queue_item *qi = NULL;
+  // while ((qi = queue_pop_nowait(self->q)))
+  // {
+  //   free(qi);
+  // }
+  thrd_detach(self->thread);
+  struct queue_item *qi = NULL;
+  while ((qi = queue_pop(self->q)))
   {
+    if (qi->buf == NULL && qi->len == -1) {
+      free(qi);
+      break;
+    }
     free(qi);
   }
-  thrd_join(self->thread, NULL);
+
   if (self->previous_queue_item)
   {
     free(self->previous_queue_item);
