@@ -2,13 +2,12 @@
 #include <lua5.1/lauxlib.h>
 #include <windows.h>
 
-#include "bridge_public.h"
+#include "bridge.h"
 #include "ods.h"
 
-HMODULE g_auf = NULL;
-struct bridge *g_bridge_api = NULL;
+bool initialized = false;
 
-static int bridge_call_error(lua_State *L, int err)
+static int lua_bridge_call_error(lua_State *L, int err)
 {
   switch (err)
   {
@@ -28,30 +27,19 @@ static int bridge_call_error(lua_State *L, int err)
   return luaL_error(L, "unexpected error code");
 }
 
-static int bridge_call(lua_State *L)
+static int lua_bridge_call(lua_State *L)
 {
-  if (!g_bridge_api)
+  if (!initialized)
   {
-    if (!g_auf)
-    {
-      g_auf = LoadLibrary("bridge.auf");
-      if (!g_auf)
-      {
-        return luaL_error(L, "could not found bridge.auf");
-      }
+    lua_getglobal(L, "obj");
+    lua_getfield(L, -1, "getinfo");
+    lua_pushstring(L, "image_max");
+    lua_call(L, 1, 2);
+    if (!bridge_init(lua_tointeger(L, -2), lua_tointeger(L, -1))) {
+        return luaL_error(L, "failed to initialize bridge.dll");
     }
-    typedef struct bridge *(__stdcall * GBAPI)(void);
-    GBAPI GetBridgeAPI = (GBAPI)GetProcAddress(g_auf, "GetBridgeAPI");
-    //struct bridge*(__stdcall *GetBridgeAPI)(void) = (void*)GetProcAddress(g_auf, "GetBridgeAPI");
-    if (!GetBridgeAPI)
-    {
-      return luaL_error(L, "could not found GetBridgeAPI function in bridge.auf");
-    }
-    g_bridge_api = GetBridgeAPI();
-    if (!g_bridge_api)
-    {
-      return luaL_error(L, "could not access BridgeAPI");
-    }
+    lua_pop(L, 2);
+    initialized = true;
   }
 
   const char *exe_path = lua_tostring(L, 1);
@@ -116,12 +104,12 @@ static int bridge_call(lua_State *L)
         m.height = lua_tointeger(L, -1);
         lua_pop(L, 2);
       }
-      int32_t rlen;
-      void *r;
-      int err = g_bridge_api->call(exe_path, buf, buflen, &m, &r, &rlen);
+      int32_t rlen = 0;
+      void *r = NULL;
+      const int err = bridge_call(exe_path, buf, buflen, &m, &r, &rlen);
       if (err != ECALL_OK)
       {
-        return bridge_call_error(L, err);
+        return lua_bridge_call_error(L, err);
       }
       if (m.mode & MEM_MODE_WRITE && !(m.mode & MEM_MODE_DIRECT))
       {
@@ -136,10 +124,10 @@ static int bridge_call(lua_State *L)
 
   int32_t rlen = 0;
   void *r = NULL;
-  int err = g_bridge_api->call(exe_path, buf, buflen, NULL, &r, &rlen);
+  const int err = bridge_call(exe_path, buf, buflen, NULL, &r, &rlen);
   if (err != ECALL_OK)
   {
-    return bridge_call_error(L, err);
+    return lua_bridge_call_error(L, err);
   }
   lua_pushlstring(L, r, rlen);
   return 1;
@@ -168,7 +156,7 @@ static void to_hex(char *dst, uint64_t x)
   }
 }
 
-static int bridge_calc_hash(lua_State *L)
+static int lua_bridge_calc_hash(lua_State *L)
 {
   const void *p = lua_topointer(L, 1);
   const int w = lua_tointeger(L, 2);
@@ -188,8 +176,8 @@ static int bridge_calc_hash(lua_State *L)
 }
 
 static struct luaL_Reg fntable[] = {
-    {"call", bridge_call},
-    {"calc_hash", bridge_calc_hash},
+    {"call", lua_bridge_call},
+    {"calc_hash", lua_bridge_calc_hash},
     {NULL, NULL},
 };
 
@@ -209,11 +197,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     break;
 
   case DLL_PROCESS_DETACH:
-    if (g_auf)
+    if (initialized)
     {
-      FreeLibrary(g_auf);
-      g_auf = NULL;
-      g_bridge_api = NULL;
+      if (!bridge_exit()) {
+        OutputDebugString("failed to free bridge.dll");
+      }
     }
     break;
 

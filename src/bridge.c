@@ -7,9 +7,6 @@
 #include "ver.h"
 #include "ods.h"
 
-#include <stdint.h>
-#include <stdbool.h>
-
 struct hash_map_value
 {
   struct process *value;
@@ -20,25 +17,21 @@ HANDLE g_mapped_file = NULL;
 int g_bufsize = 0;
 void *g_view = NULL;
 struct hashmap_s g_process_map = { 0 };
-mtx_t g_mutex;
+mtx_t g_mutex = { 0 };
 
-static BOOL bridge_init(FILTER *fp)
+bool bridge_init(const int32_t max_width, const int32_t max_height)
 {
-  wsprintfW(g_mapped_file_name, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
+  if (max_width <= 0 || max_height <= 0) {
+    return false;
+  }
   if (hashmap_create(2, &g_process_map) != 0) {
-    return FALSE;
+    return false;
   }
   mtx_init(&g_mutex, mtx_plain | mtx_recursive);
 
-  SYS_INFO si;
-  if (!fp->exfunc->get_sys_info(NULL, &si))
-  {
-    return FALSE;
-  }
-  const int w = max(si.max_w, 1280);
-  const int h = max(si.max_h, 720);
   const int header_size = sizeof(struct share_mem_header);
-  const int body_size = w * h * sizeof(PIXEL_YC);
+  const int body_size = max_width * 4 * max_height;
+  wsprintfW(g_mapped_file_name, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
   HANDLE mapped_file = CreateFileMappingW(
       INVALID_HANDLE_VALUE,
       NULL, PAGE_READWRITE,
@@ -47,14 +40,14 @@ static BOOL bridge_init(FILTER *fp)
       g_mapped_file_name);
   if (!mapped_file)
   {
-    return FALSE;
+    return false;
   }
 
   void *view = MapViewOfFile(mapped_file, FILE_MAP_WRITE, 0, 0, 0);
   if (!view)
   {
     CloseHandle(mapped_file);
-    return FALSE;
+    return false;
   }
 
   g_mapped_file = mapped_file;
@@ -64,9 +57,9 @@ static BOOL bridge_init(FILTER *fp)
   v->header_size = header_size;
   v->body_size = body_size;
   v->version = 1;
-  v->width = w;
-  v->height = h;
-  return TRUE;
+  v->width = max_width;
+  v->height = max_height;
+  return true;
 }
 
 static int delete_all_callback(void* const context, void* const value) {
@@ -77,9 +70,8 @@ static int delete_all_callback(void* const context, void* const value) {
   return 1;
 }
 
-static BOOL bridge_exit(FILTER *fp)
+bool bridge_exit(void)
 {
-  (void)fp;
   mtx_lock(&g_mutex);
   hashmap_iterate(&g_process_map, delete_all_callback, NULL);
   hashmap_destroy(&g_process_map);
@@ -94,7 +86,7 @@ static BOOL bridge_exit(FILTER *fp)
     g_mapped_file = NULL;
   }
   mtx_destroy(&g_mutex);
-  return TRUE;
+  return true;
 }
 
 static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
@@ -181,50 +173,10 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
   return ECALL_OK;
 }
 
-static int bridge_call(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
+int bridge_call(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen)
 {
   mtx_lock(&g_mutex);
   int ret = bridge_call_core(exe_path, buf, len, mem, r, rlen);
   mtx_unlock(&g_mutex);
   return ret;
 }
-
-#define BRIDGE_NAME "\x83\x75\x83\x8A\x83\x62\x83\x57"
-FILTER_DLL bridge_filter = {
-    FILTER_FLAG_ALWAYS_ACTIVE | FILTER_FLAG_EX_INFORMATION | FILTER_FLAG_NO_CONFIG | FILTER_FLAG_RADIO_BUTTON,
-    0,
-    0,
-    BRIDGE_NAME,
-    0,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0,
-    NULL,
-    NULL,
-    NULL,
-    bridge_init,
-    bridge_exit,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0,
-    BRIDGE_NAME " " VERSION,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    {0, 0},
-};
-
-struct bridge bridge_api = {0, bridge_call};

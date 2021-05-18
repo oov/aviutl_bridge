@@ -1,4 +1,4 @@
-# bridge.auf / bridge.dll
+# bridge.dll
 
 拡張編集で Lua から外部プログラムを使って処理をしやすくするためのプラグインです。
 
@@ -6,16 +6,14 @@
 
 ## 注意事項
 
-bridge.auf / bridge.dll は無保証で提供されます。  
-bridge.auf / bridge.dll を使用したこと及び使用しなかったことによるいかなる損害について、開発者は何も責任を負いません。
+bridge.dll は無保証で提供されます。  
+bridge.dll を使用したこと及び使用しなかったことによるいかなる損害について、開発者は何も責任を負いません。
 
-これに同意できない場合、あなたは bridge.auf / bridge.dll を使用することができません。
+これに同意できない場合、あなたは bridge.dll を使用することができません。
 
 # インストール／アンインストール
 
-1. `bridge.auf` を `aviutl.exe` と同じ場所か、`plugins` フォルダーの中へ入れます。
-2. `bridge.dll` を `exedit.auf` と同じフォルダーにある `script` フォルダーの中に入れます。  
-`script` フォルダーが見つからない場合は作成してください。
+`bridge.dll` を `exedit.auf` と同じ場所に入れてください。
 
 アンインストールは導入したファイルを削除するだけで完了です。
 
@@ -170,6 +168,12 @@ local hash = require("bridge").calc_hash(obj.getpixeldata());
 
 ## 更新履歴
 
+### v0.13 2021-05-18
+
+- bridge.auf を廃止
+  - インストール方法が変わりました
+  - 今までの bridge.auf / bridge.dll は予め削除してからインストールしてください
+
 ### v0.12 2021-03-16
 
 - ハッシュマップのライブラリを変更
@@ -222,32 +226,6 @@ local hash = require("bridge").calc_hash(obj.getpixeldata());
 ## Credits
 
 bridge.auf / bridge.dll is made possible by the following open source softwares.
-
-### AviUtl Plugin SDK
-
-http://spring-fragrance.mints.ne.jp/aviutl/
-
-The MIT License
-
-Copyright (c) 1999-2012 Kenkun
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 ### Lua
 

@@ -1,22 +1,16 @@
-add_library(aviutl_plugin SHARED)
-set_target_properties(aviutl_plugin PROPERTIES OUTPUT_NAME "bridge.auf" PREFIX "" SUFFIX "")
-target_sources(aviutl_plugin PRIVATE
-  main.c
-  process.c
-  bridge.c
-  ods.c
-)
-
 add_library(lua_plugin SHARED)
 set_target_properties(lua_plugin PROPERTIES OUTPUT_NAME "bridge.dll" PREFIX "" SUFFIX "")
 target_sources(lua_plugin PRIVATE
   luamain.c
+  process.c
+  bridge.c
+  ods.c
 )
 target_link_libraries(lua_plugin PRIVATE
   lua5.1
 )
 
-set(targets aviutl_plugin lua_plugin)
+set(targets lua_plugin)
 foreach(target ${targets})
 
 if (("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU") OR

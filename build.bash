@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mkdir -p bin/script
+mkdir -p bin
 
 # copy readme
 sed 's/\r$//' README.md | sed 's/$/\r/' > bin/bridge.txt
@@ -32,10 +32,9 @@ cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang ..
 ninja
 cd ..
 
-rm -rf bin/bridge.auf bin/script/bridge.dll
-cp build/src/bridge.auf bin/bridge.auf
-cp build/src/bridge.dll bin/script/bridge.dll
+rm -rf bin/bridge.dll
+cp build/src/bridge.dll bin/bridge.dll
 
 cd bin
-zip aviutl_bridge_wip.zip bridge.auf bridge.txt script/bridge.dll
+zip aviutl_bridge_wip.zip bridge.txt bridge.dll
 cd ..
