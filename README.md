@@ -166,7 +166,7 @@ int main(){
 }
 ```
 
-画像からハッシュ値を検索する `calc_hash` もあります。
+画像からハッシュ値を計算する `calc_hash` もあります。
 
 ```lua
 local hash = require("bridge").calc_hash(obj.getpixeldata());
