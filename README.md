@@ -1,5 +1,7 @@
 # bridge.dll
 
+@git_tag@ ( @git_revision@ )
+
 拡張編集で Lua から外部プログラムを使って処理をしやすくするためのプラグインです。
 
 外部プログラムは stdin / stdout を使って通信するものを作成する必要があります。
@@ -11,6 +13,10 @@ bridge.dll を使用したこと及び使用しなかったことによるいか
 
 これに同意できない場合、あなたは bridge.dll を使用することができません。
 
+# ダウンロード
+
+https://github.com/oov/aviutl_bridge/releases
+
 # インストール／アンインストール
 
 `bridge.dll` を `exedit.auf` と同じ場所に入れてください。
@@ -19,7 +25,7 @@ bridge.dll を使用したこと及び使用しなかったことによるいか
 
 # 使い方
 
-拡張編集上でスクリプト制御などから以下のようにすると、`C:\your\binary.exe` が起動し、標準入力から `stdin data` が渡され、標準出力したデータが `stdout_data` に届きます。
+拡張編集上でスクリプト制御などから以下のようにすると、`C:\your\binary.exe` が起動し、標準入力から `stdin data` が渡され、標準出力からのデータが `stdout_data` に届きます。
 
 ```lua
 -- 単純な例
@@ -223,9 +229,14 @@ local hash = require("bridge").calc_hash(obj.getpixeldata());
 
 - 初版
 
+## バイナリのビルドについて
+
+bridge.dll は [MSYS2](https://www.msys2.org/) + MINGW32 上で開発しています。  
+ビルド方法や必要になるパッケージなどは [GitHub Actions の設定ファイル](https://github.com/oov/aviutl_bridge/blob/main/.github/workflows/releaser.yml) を参考にしてください。
+
 ## Credits
 
-bridge.auf / bridge.dll is made possible by the following open source softwares.
+bridge.dll is made possible by the following open source softwares.
 
 ### Lua
 

@@ -5,7 +5,20 @@
 #include "bridge.h"
 #include "ods.h"
 
-bool initialized = false;
+static bool initialized = false;
+
+static inline void *deconst(void const *const ptr) {
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  if __has_warning("-Wcast-qual")
+#    pragma GCC diagnostic ignored "-Wcast-qual"
+#  endif
+  return (void *)ptr;
+#  pragma GCC diagnostic pop
+#else
+  return (void *)ptr;
+#endif // __GNUC__
+}
 
 static int lua_bridge_call_error(lua_State *L, int err)
 {
@@ -79,7 +92,7 @@ static int lua_bridge_call(lua_State *L)
       m.mode = mode;
       if (mode & MEM_MODE_DIRECT)
       {
-        m.buf = (void *)lua_topointer(L, 4);
+        m.buf = deconst(lua_topointer(L, 4));
         m.width = lua_tointeger(L, 5);
         m.height = lua_tointeger(L, 6);
         if (!m.buf || m.width == 0 || m.height == 0)
@@ -99,14 +112,14 @@ static int lua_bridge_call(lua_State *L)
         lua_pop(L, 2);
         lua_getfield(L, -1, "getpixeldata");
         lua_call(L, 0, 3);
-        m.buf = (void *)lua_topointer(L, -3);
+        m.buf = deconst(lua_topointer(L, -3));
         m.width = lua_tointeger(L, -2);
         m.height = lua_tointeger(L, -1);
         lua_pop(L, 2);
       }
       int32_t rlen = 0;
       void *r = NULL;
-      const int err = bridge_call(exe_path, buf, buflen, &m, &r, &rlen);
+      const int err = bridge_call(exe_path, buf, (int32_t)buflen, &m, &r, &rlen);
       if (err != ECALL_OK)
       {
         return lua_bridge_call_error(L, err);
@@ -117,19 +130,19 @@ static int lua_bridge_call(lua_State *L)
         lua_pushvalue(L, -2);
         lua_call(L, 1, 0);
       }
-      lua_pushlstring(L, r, rlen);
+      lua_pushlstring(L, r, (size_t)rlen);
       return 1;
     }
   }
 
   int32_t rlen = 0;
   void *r = NULL;
-  const int err = bridge_call(exe_path, buf, buflen, NULL, &r, &rlen);
+  const int err = bridge_call(exe_path, buf, (int32_t)buflen, NULL, &r, &rlen);
   if (err != ECALL_OK)
   {
     return lua_bridge_call_error(L, err);
   }
-  lua_pushlstring(L, r, rlen);
+  lua_pushlstring(L, r, (size_t)rlen);
   return 1;
 }
 
@@ -170,7 +183,7 @@ static int lua_bridge_calc_hash(lua_State *L)
     return luaL_error(L, "invalid arguments");
   }
   char b[16];
-  to_hex(b, cyrb64(p, w * h, 0x3fc0b49e));
+  to_hex(b, cyrb64(p, (size_t)(w * h), 0x3fc0b49e));
   lua_pushlstring(L, b, 16);
   return 1;
 }
@@ -181,12 +194,14 @@ static struct luaL_Reg fntable[] = {
     {NULL, NULL},
 };
 
+EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L);
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L)
 {
   luaL_register(L, "bridge", fntable);
   return 1;
 }
 
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
   (void)hinstDLL;

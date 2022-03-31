@@ -1,6 +1,7 @@
 #include "process.h"
 
-#include "threads/threads.h"
+#include "threads.h"
+
 #include <windows.h>
 #include <stdint.h>
 
@@ -61,7 +62,7 @@ cleanup:
   return NULL;
 }
 
-void queue_destroy(struct queue *const q)
+static void queue_destroy(struct queue *const q)
 {
   cnd_destroy(&q->cnd2);
   cnd_destroy(&q->cnd);
@@ -69,7 +70,7 @@ void queue_destroy(struct queue *const q)
   free(q);
 }
 
-void queue_push(struct queue *const q, void *item)
+static void queue_push(struct queue *const q, void *item)
 {
   mtx_lock(&q->mtx);
   while (q->used == q->num_items)
@@ -83,7 +84,7 @@ void queue_push(struct queue *const q, void *item)
   mtx_unlock(&q->mtx);
 }
 
-void *queue_pop(struct queue *const q)
+static void *queue_pop(struct queue *const q)
 {
   void *r = NULL;
   mtx_lock(&q->mtx);
@@ -100,7 +101,8 @@ void *queue_pop(struct queue *const q)
   return r;
 }
 
-void *queue_pop_nowait(struct queue *const q)
+#if 0
+static void *queue_pop_nowait(struct queue *const q)
 {
   void *r = NULL;
   mtx_lock(&q->mtx);
@@ -115,6 +117,7 @@ void *queue_pop_nowait(struct queue *const q)
   mtx_unlock(&q->mtx);
   return r;
 }
+#endif
 
 struct queue_item
 {
@@ -153,7 +156,7 @@ static WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
     src += l;
   }
 
-  WCHAR *newenv = calloc(len + 1, sizeof(WCHAR));
+  WCHAR *newenv = calloc((size_t)(len + 1), sizeof(WCHAR));
   if (!newenv)
   {
     goto cleanup;
@@ -168,7 +171,7 @@ static WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
   dest += value_len + 1;
   len -= value_len + 1;
 
-  memcpy(dest, envstr, len * sizeof(WCHAR));
+  memcpy(dest, envstr, (size_t)(len) * sizeof(WCHAR));
   FreeEnvironmentStringsW(envstr);
   return newenv;
 cleanup:
@@ -180,7 +183,7 @@ cleanup:
 static WCHAR *get_working_directory(const WCHAR *exe_path)
 {
   int exe_pathlen = lstrlenW(exe_path) + 1;
-  WCHAR *path = calloc(exe_pathlen, sizeof(WCHAR));
+  WCHAR *path = calloc((size_t)exe_pathlen, sizeof(WCHAR));
   if (!path)
   {
     return NULL;
@@ -201,15 +204,15 @@ static WCHAR *get_working_directory(const WCHAR *exe_path)
       path[pathlen++] = *exe_path++;
     }
   }
-  int dirlen = GetFullPathNameW(path, 0, NULL, NULL);
+  int dirlen = (int)GetFullPathNameW(path, 0, NULL, NULL);
   if (dirlen == 0)
   {
     free(path);
     return NULL;
   }
-  WCHAR *dir = calloc(dirlen, sizeof(WCHAR));
+  WCHAR *dir = calloc((size_t)dirlen, sizeof(WCHAR));
   WCHAR *fn = NULL;
-  if (GetFullPathNameW(path, dirlen, dir, &fn) == 0 || fn == NULL)
+  if (GetFullPathNameW(path, (DWORD)dirlen, dir, &fn) == 0 || fn == NULL)
   {
     free(dir);
     free(path);
@@ -235,7 +238,7 @@ static BOOL read(HANDLE h, void *buf, DWORD sz)
 
 static BOOL write(HANDLE h, const void *buf, DWORD sz)
 {
-  char *b = (void *)buf;
+  const char *b = buf;
   for (DWORD written; sz > 0; b += written, sz -= written)
   {
     if (!WriteFile(h, b, sz, &written, NULL))
@@ -256,12 +259,12 @@ static int read_worker(void *userdata)
     {
       goto error;
     }
-    struct queue_item *qi = malloc(sizeof(struct queue_item) + sz);
+    struct queue_item *qi = malloc(sizeof(struct queue_item) + (size_t)sz);
     qi->len = sz;
     if (sz)
     {
       qi->buf = qi + 1;
-      if (!read(self->out_r, qi->buf, sz))
+      if (!read(self->out_r, qi->buf, (DWORD)sz))
       {
         free(qi);
         goto error;
@@ -273,7 +276,6 @@ static int read_worker(void *userdata)
     }
     queue_push(self->q, qi);
   }
-  return 0;
 
 error:
 {
@@ -287,7 +289,7 @@ error:
 
 int process_write(struct process *self, const void *buf, size_t len)
 {
-  int32_t sz = len;
+  int32_t sz = (int32_t)len;
   if (!write(self->in_w, &sz, sizeof(sz)))
   {
     return 1;
@@ -316,7 +318,7 @@ int process_read(struct process *self, void **buf, size_t *len)
     return 2;
   }
   *buf = qi->buf;
-  *len = qi->len;
+  *len = (size_t)qi->len;
   return 0;
 }
 
@@ -379,7 +381,7 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
 
   // have to copy this buffer because CreateProcessW may modify path string.
   int pathlen = lstrlenW(exe_path) + 1;
-  path = calloc(pathlen, sizeof(WCHAR));
+  path = calloc((size_t)pathlen, sizeof(WCHAR));
   if (!path)
   {
     goto cleanup;
@@ -570,7 +572,7 @@ void process_finish(struct process *self)
   {
     free(self->previous_queue_item);
     self->previous_queue_item = NULL;
-  }
+  } 
   queue_destroy(self->q);
   free(self);
 }

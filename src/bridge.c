@@ -1,10 +1,10 @@
 #include "bridge.h"
 
 #include "hashmap.h"
-#include "threads/threads.h"
+#include "threads.h"
 
 #include "process.h"
-#include "ver.h"
+#include "version.h"
 #include "ods.h"
 
 struct hash_map_value
@@ -12,12 +12,12 @@ struct hash_map_value
   struct process *value;
 };
 
-WCHAR g_mapped_file_name[32];
-HANDLE g_mapped_file = NULL;
-int g_bufsize = 0;
-void *g_view = NULL;
-struct hashmap_s g_process_map = { 0 };
-mtx_t g_mutex = { 0 };
+static WCHAR g_mapped_file_name[32];
+static HANDLE g_mapped_file = NULL;
+static int g_bufsize = 0;
+static void *g_view = NULL;
+static struct hashmap_s g_process_map = { 0 };
+static mtx_t g_mutex = { 0 };
 
 bool bridge_init(const int32_t max_width, const int32_t max_height)
 {
@@ -36,7 +36,7 @@ bool bridge_init(const int32_t max_width, const int32_t max_height)
       INVALID_HANDLE_VALUE,
       NULL, PAGE_READWRITE,
       0,
-      header_size + body_size,
+      (DWORD)(header_size + body_size),
       g_mapped_file_name);
   if (!mapped_file)
   {
@@ -55,10 +55,10 @@ bool bridge_init(const int32_t max_width, const int32_t max_height)
   g_bufsize = header_size + body_size;
   struct share_mem_header *v = view;
   v->header_size = header_size;
-  v->body_size = body_size;
+  v->body_size = (uint32_t)body_size;
   v->version = 1;
-  v->width = max_width;
-  v->height = max_height;
+  v->width = (uint32_t)max_width;
+  v->height = (uint32_t)max_height;
   return true;
 }
 
@@ -95,7 +95,7 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
   {
     return ECALL_NOT_INITIALIZED;
   }
-  const size_t exe_path_len = lstrlenA(exe_path);
+  const size_t exe_path_len = (size_t)(lstrlenA(exe_path));
   struct hash_map_value *hmv = hashmap_get(&g_process_map, exe_path, exe_path_len);
   if (hmv)
   {
@@ -111,14 +111,14 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
   if (!hmv)
   {
     hmv = malloc(sizeof(struct hash_map_value) + exe_path_len);
-    int buflen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, exe_path_len, NULL, 0);
-    WCHAR *wpath = malloc(sizeof(WCHAR) * (buflen+1));
+    int buflen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, (int)exe_path_len, NULL, 0);
+    WCHAR *wpath = malloc(sizeof(WCHAR) * (size_t)(buflen+1));
     if (!wpath)
     {
       free(hmv);
       return ECALL_FAILED_TO_CONVERT_EXE_PATH;
     }
-    if (MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, exe_path_len, wpath, buflen) == 0)
+    if (MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, exe_path, (int)exe_path_len, wpath, buflen) == 0)
     {
       free(hmv);
       free(wpath);
@@ -146,14 +146,14 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
   if (mem)
   {
     struct share_mem_header *v = g_view;
-    v->width = mem->width;
-    v->height = mem->height;
+    v->width = (uint32_t)mem->width;
+    v->height = (uint32_t)mem->height;
     if (mem->mode & MEM_MODE_READ)
     {
-      memcpy(v + 1, mem->buf, mem->width * 4 * mem->height);
+      memcpy(v + 1, mem->buf, (size_t)(mem->width * 4 * mem->height));
     }
   }
-  if (process_write(hmv->value, buf, len) != 0)
+  if (process_write(hmv->value, buf, (size_t)len) != 0)
   {
     return ECALL_FAILED_TO_SEND_COMMAND;
   }
@@ -166,10 +166,10 @@ static int bridge_call_core(const char *exe_path, const void *buf, int32_t len, 
   if (mem && mem->mode & MEM_MODE_WRITE)
   {
     struct share_mem_header *v = g_view;
-    memcpy(mem->buf, v + 1, mem->width * 4 * mem->height);
+    memcpy(mem->buf, v + 1, (size_t)(mem->width * 4 * mem->height));
   }
   *r = rbuf;
-  *rlen = rbuflen;
+  *rlen = (int32_t)rbuflen;
   return ECALL_OK;
 }
 
