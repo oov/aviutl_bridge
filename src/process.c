@@ -245,7 +245,7 @@ error : {
   return 1;
 }
 
-int process_write(struct process *self, const void *buf, size_t len) {
+int process_write(struct process *const self, void const *const buf, size_t const len) {
   int32_t sz = (int32_t)len;
   if (!write(self->in_w, &sz, sizeof(sz))) {
     return 1;
@@ -256,7 +256,7 @@ int process_write(struct process *self, const void *buf, size_t len) {
   return 0;
 }
 
-int process_read(struct process *self, void **buf, size_t *len) {
+int process_read(struct process *const self, void **const buf, size_t *const len) {
   struct queue_item *qi = queue_pop(self->q);
   if (!qi) {
     return 1;
@@ -451,7 +451,7 @@ cleanup:
   return NULL;
 }
 
-void process_finish(struct process *self) {
+void process_finish(struct process *const self) {
   if (self->in_w != INVALID_HANDLE_VALUE) {
     CloseHandle(self->in_w);
     self->in_w = INVALID_HANDLE_VALUE;
@@ -494,9 +494,11 @@ void process_finish(struct process *self) {
   free(self);
 }
 
-void process_close_stderr(struct process *self) {
+void process_close_stderr(struct process *const self) {
   CloseHandle(self->err_r);
   self->err_r = INVALID_HANDLE_VALUE;
 }
 
-bool process_isrunning(const struct process *self) { return WaitForSingleObject(self->process, 0) == WAIT_TIMEOUT; }
+bool process_isrunning(struct process const *const self) {
+  return WaitForSingleObject(self->process, 0) == WAIT_TIMEOUT;
+}

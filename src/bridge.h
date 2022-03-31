@@ -33,6 +33,11 @@ struct call_mem {
   int32_t height;
 };
 
-bool bridge_init(const int32_t max_width, const int32_t max_height);
-int bridge_call(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen);
+bool bridge_init(int32_t const max_width, int32_t const max_height);
+int bridge_call(char const *const exe_path,
+                void const *const buf,
+                int32_t const len,
+                struct call_mem *const mem,
+                void **const r,
+                int32_t *const rlen);
 bool bridge_exit(void);

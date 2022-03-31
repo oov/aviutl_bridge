@@ -1,3 +1,3 @@
 #pragma once
 
-void ODS(const char *fmt, ...);
+void ODS(char const *const fmt, ...);

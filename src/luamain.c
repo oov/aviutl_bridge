@@ -121,7 +121,7 @@ static int lua_bridge_call(lua_State *L) {
 
   int32_t rlen = 0;
   void *r = NULL;
-  const int err = bridge_call(exe_path, buf, (int32_t)buflen, NULL, &r, &rlen);
+  int const err = bridge_call(exe_path, buf, (int32_t)buflen, NULL, &r, &rlen);
   if (err != ECALL_OK) {
     return lua_bridge_call_error(L, err);
   }
@@ -129,7 +129,7 @@ static int lua_bridge_call(lua_State *L) {
   return 1;
 }
 
-static uint64_t cyrb64(const uint32_t *src, const size_t len, const uint32_t seed) {
+static uint64_t cyrb64(uint32_t const *const src, size_t const len, uint32_t const seed) {
   uint32_t h1 = 0x91eb9dc7 ^ seed, h2 = 0x41c6ce57 ^ seed;
   for (size_t i = 0; i < len; ++i) {
     h1 = (h1 ^ src[i]) * 2654435761;
@@ -140,7 +140,7 @@ static uint64_t cyrb64(const uint32_t *src, const size_t len, const uint32_t see
   return (((uint64_t)h2) << 32) | ((uint64_t)h1);
 }
 
-static void to_hex(char *dst, uint64_t x) {
+static inline void to_hex(char *const dst, uint64_t x) {
   const char *chars = "0123456789abcdef";
   for (int i = 15; i >= 0; --i) {
     dst[i] = chars[x & 0xf];
@@ -149,9 +149,9 @@ static void to_hex(char *dst, uint64_t x) {
 }
 
 static int lua_bridge_calc_hash(lua_State *L) {
-  const void *p = lua_topointer(L, 1);
-  const int w = lua_tointeger(L, 2);
-  const int h = lua_tointeger(L, 3);
+  void const *const p = lua_topointer(L, 1);
+  int const w = lua_tointeger(L, 2);
+  int const h = lua_tointeger(L, 3);
   if (!p) {
     return luaL_error(L, "has no image");
   }
@@ -164,14 +164,13 @@ static int lua_bridge_calc_hash(lua_State *L) {
   return 1;
 }
 
-static struct luaL_Reg fntable[] = {
-    {"call", lua_bridge_call},
-    {"calc_hash", lua_bridge_calc_hash},
-    {NULL, NULL},
-};
-
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L);
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L) {
+  static const struct luaL_Reg fntable[] = {
+      {"call", lua_bridge_call},
+      {"calc_hash", lua_bridge_calc_hash},
+      {NULL, NULL},
+  };
   luaL_register(L, "bridge", fntable);
   return 1;
 }

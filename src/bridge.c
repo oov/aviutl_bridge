@@ -18,7 +18,7 @@ static void *g_view = NULL;
 static struct hashmap_s g_process_map = {0};
 static mtx_t g_mutex = {0};
 
-bool bridge_init(const int32_t max_width, const int32_t max_height) {
+bool bridge_init(int32_t const max_width, int32_t const max_height) {
   if (max_width <= 0 || max_height <= 0) {
     return false;
   }
@@ -27,8 +27,8 @@ bool bridge_init(const int32_t max_width, const int32_t max_height) {
   }
   mtx_init(&g_mutex, mtx_plain | mtx_recursive);
 
-  const int header_size = sizeof(struct share_mem_header);
-  const int body_size = max_width * 4 * max_height;
+  int const header_size = sizeof(struct share_mem_header);
+  int const body_size = max_width * 4 * max_height;
   wsprintfW(g_mapped_file_name, L"aviutl_bridge_fmo_%08x", GetCurrentProcessId());
   HANDLE mapped_file = CreateFileMappingW(
       INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, (DWORD)(header_size + body_size), g_mapped_file_name);
@@ -36,7 +36,7 @@ bool bridge_init(const int32_t max_width, const int32_t max_height) {
     return false;
   }
 
-  void *view = MapViewOfFile(mapped_file, FILE_MAP_WRITE, 0, 0, 0);
+  void *const view = MapViewOfFile(mapped_file, FILE_MAP_WRITE, 0, 0, 0);
   if (!view) {
     CloseHandle(mapped_file);
     return false;
@@ -45,7 +45,7 @@ bool bridge_init(const int32_t max_width, const int32_t max_height) {
   g_mapped_file = mapped_file;
   g_view = view;
   g_bufsize = header_size + body_size;
-  struct share_mem_header *v = view;
+  struct share_mem_header *const v = view;
   v->header_size = header_size;
   v->body_size = (uint32_t)body_size;
   v->version = 1;
@@ -78,8 +78,12 @@ bool bridge_exit(void) {
   return true;
 }
 
-static int
-bridge_call_core(const char *exe_path, const void *buf, int32_t len, struct call_mem *mem, void **r, int32_t *rlen) {
+static int bridge_call_core(char const *const exe_path,
+                            void const *const buf,
+                            int32_t const len,
+                            struct call_mem *const mem,
+                            void **const r,
+                            int32_t *const rlen) {
   if (g_bufsize == 0 || !g_view) {
     return ECALL_NOT_INITIALIZED;
   }
