@@ -2,11 +2,11 @@
 
 #include "threads.h"
 
-#include <windows.h>
 #include <stdint.h>
+#include <wchar.h>
+#include <windows.h>
 
-struct queue
-{
+struct queue {
   mtx_t mtx;
   cnd_t cnd, cnd2;
   void **items;
@@ -14,14 +14,12 @@ struct queue
   int readcur, writecur;
 };
 
-static struct queue *queue_init(void **items, int num_items)
-{
+static struct queue *queue_init(void **items, int num_items) {
   int mtx_ret = thrd_error;
   int cnd_ret = thrd_error;
   int cnd2_ret = thrd_error;
   struct queue *const q = malloc(sizeof(struct queue));
-  if (!q)
-  {
+  if (!q) {
     return NULL;
   }
   q->items = items;
@@ -30,51 +28,42 @@ static struct queue *queue_init(void **items, int num_items)
   q->readcur = 0;
   q->writecur = 0;
   mtx_ret = mtx_init(&q->mtx, mtx_plain | mtx_recursive);
-  if (mtx_ret != thrd_success)
-  {
+  if (mtx_ret != thrd_success) {
     goto cleanup;
   }
   cnd_ret = cnd_init(&q->cnd);
-  if (cnd_ret != thrd_success)
-  {
+  if (cnd_ret != thrd_success) {
     goto cleanup;
   }
   cnd2_ret = cnd_init(&q->cnd2);
-  if (cnd2_ret != thrd_success)
-  {
+  if (cnd2_ret != thrd_success) {
     goto cleanup;
   }
   return q;
 cleanup:
-  if (cnd2_ret == thrd_success)
-  {
+  if (cnd2_ret == thrd_success) {
     cnd_destroy(&q->cnd2);
   }
-  if (cnd_ret == thrd_success)
-  {
+  if (cnd_ret == thrd_success) {
     cnd_destroy(&q->cnd);
   }
-  if (mtx_ret == thrd_success)
-  {
+  if (mtx_ret == thrd_success) {
     mtx_destroy(&q->mtx);
   }
   free(q);
   return NULL;
 }
 
-static void queue_destroy(struct queue *const q)
-{
+static void queue_destroy(struct queue *const q) {
   cnd_destroy(&q->cnd2);
   cnd_destroy(&q->cnd);
   mtx_destroy(&q->mtx);
   free(q);
 }
 
-static void queue_push(struct queue *const q, void *item)
-{
+static void queue_push(struct queue *const q, void *item) {
   mtx_lock(&q->mtx);
-  while (q->used == q->num_items)
-  {
+  while (q->used == q->num_items) {
     cnd_wait(&q->cnd2, &q->mtx);
   }
   q->items[q->writecur] = item;
@@ -84,12 +73,10 @@ static void queue_push(struct queue *const q, void *item)
   mtx_unlock(&q->mtx);
 }
 
-static void *queue_pop(struct queue *const q)
-{
+static void *queue_pop(struct queue *const q) {
   void *r = NULL;
   mtx_lock(&q->mtx);
-  while (q->used == 0)
-  {
+  while (q->used == 0) {
     cnd_wait(&q->cnd, &q->mtx);
   }
   r = q->items[q->readcur];
@@ -119,14 +106,12 @@ static void *queue_pop_nowait(struct queue *const q)
 }
 #endif
 
-struct queue_item
-{
+struct queue_item {
   void *buf;
   int32_t len;
 };
 
-struct process
-{
+struct process {
   HANDLE process;
   thrd_t thread;
   struct queue *q;
@@ -137,11 +122,9 @@ struct process
   HANDLE err_r;
 };
 
-static WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
-{
+static wchar_t *build_environment_strings(wchar_t const *const name, wchar_t const *const value) {
   LPWCH envstr = GetEnvironmentStringsW();
-  if (!envstr)
-  {
+  if (!envstr) {
     return NULL;
   }
 
@@ -149,29 +132,27 @@ static WCHAR *build_environment_strings(const WCHAR *name, const WCHAR *value)
   const int value_len = lstrlenW(value);
   int len = name_len + 1 + value_len + 1;
   LPWCH src = envstr;
-  while (*src)
-  {
+  while (*src) {
     int l = lstrlenW(src) + 1;
     len += l;
     src += l;
   }
 
-  WCHAR *newenv = calloc((size_t)(len + 1), sizeof(WCHAR));
-  if (!newenv)
-  {
+  wchar_t *newenv = calloc((size_t)(len + 1), sizeof(WCHAR));
+  if (!newenv) {
     goto cleanup;
   }
 
-  WCHAR *dest = newenv;
-  lstrcpyW(dest, name);
+  wchar_t *dest = newenv;
+  wcscpy(dest, name);
   dest += name_len;
   *dest++ = L'=';
   len -= name_len + 1;
-  lstrcpyW(dest, value);
+  wcscpy(dest, value);
   dest += value_len + 1;
   len -= value_len + 1;
 
-  memcpy(dest, envstr, (size_t)(len) * sizeof(WCHAR));
+  memcpy(dest, envstr, (size_t)(len) * sizeof(wchar_t));
   FreeEnvironmentStringsW(envstr);
   return newenv;
 cleanup:
@@ -180,40 +161,31 @@ cleanup:
   return NULL;
 }
 
-static WCHAR *get_working_directory(const WCHAR *exe_path)
-{
+static WCHAR *get_working_directory(const WCHAR *exe_path) {
   int exe_pathlen = lstrlenW(exe_path) + 1;
   WCHAR *path = calloc((size_t)exe_pathlen, sizeof(WCHAR));
-  if (!path)
-  {
+  if (!path) {
     return NULL;
   }
   int pathlen = 0;
-  if (*exe_path == L'"')
-  {
+  if (*exe_path == L'"') {
     ++exe_path;
-    while (*exe_path != L'\0' && *exe_path != L'"')
-    {
+    while (*exe_path != L'\0' && *exe_path != L'"') {
       path[pathlen++] = *exe_path++;
     }
-  }
-  else
-  {
-    while (*exe_path != L'\0' && *exe_path != L' ')
-    {
+  } else {
+    while (*exe_path != L'\0' && *exe_path != L' ') {
       path[pathlen++] = *exe_path++;
     }
   }
   int dirlen = (int)GetFullPathNameW(path, 0, NULL, NULL);
-  if (dirlen == 0)
-  {
+  if (dirlen == 0) {
     free(path);
     return NULL;
   }
   WCHAR *dir = calloc((size_t)dirlen, sizeof(WCHAR));
   WCHAR *fn = NULL;
-  if (GetFullPathNameW(path, (DWORD)dirlen, dir, &fn) == 0 || fn == NULL)
-  {
+  if (GetFullPathNameW(path, (DWORD)dirlen, dir, &fn) == 0 || fn == NULL) {
     free(dir);
     free(path);
     return NULL;
@@ -223,62 +195,48 @@ static WCHAR *get_working_directory(const WCHAR *exe_path)
   return dir;
 }
 
-static BOOL read(HANDLE h, void *buf, DWORD sz)
-{
+static BOOL read(HANDLE h, void *buf, DWORD sz) {
   char *b = buf;
-  for (DWORD read; sz > 0; b += read, sz -= read)
-  {
-    if (!ReadFile(h, b, sz, &read, NULL))
-    {
+  for (DWORD read; sz > 0; b += read, sz -= read) {
+    if (!ReadFile(h, b, sz, &read, NULL)) {
       return FALSE;
     }
   }
   return TRUE;
 }
 
-static BOOL write(HANDLE h, const void *buf, DWORD sz)
-{
+static BOOL write(HANDLE h, const void *buf, DWORD sz) {
   const char *b = buf;
-  for (DWORD written; sz > 0; b += written, sz -= written)
-  {
-    if (!WriteFile(h, b, sz, &written, NULL))
-    {
+  for (DWORD written; sz > 0; b += written, sz -= written) {
+    if (!WriteFile(h, b, sz, &written, NULL)) {
       return FALSE;
     }
   }
   return TRUE;
 }
 
-static int read_worker(void *userdata)
-{
+static int read_worker(void *userdata) {
   struct process *self = userdata;
-  while (1)
-  {
+  while (1) {
     int32_t sz;
-    if (!read(self->out_r, &sz, sizeof(sz)))
-    {
+    if (!read(self->out_r, &sz, sizeof(sz))) {
       goto error;
     }
     struct queue_item *qi = malloc(sizeof(struct queue_item) + (size_t)sz);
     qi->len = sz;
-    if (sz)
-    {
+    if (sz) {
       qi->buf = qi + 1;
-      if (!read(self->out_r, qi->buf, (DWORD)sz))
-      {
+      if (!read(self->out_r, qi->buf, (DWORD)sz)) {
         free(qi);
         goto error;
       }
-    }
-    else
-    {
+    } else {
       qi->buf = NULL;
     }
     queue_push(self->q, qi);
   }
 
-error:
-{
+error : {
   struct queue_item *qi = malloc(sizeof(struct queue_item));
   qi->buf = NULL;
   qi->len = -1;
@@ -287,34 +245,27 @@ error:
   return 1;
 }
 
-int process_write(struct process *self, const void *buf, size_t len)
-{
+int process_write(struct process *self, const void *buf, size_t len) {
   int32_t sz = (int32_t)len;
-  if (!write(self->in_w, &sz, sizeof(sz)))
-  {
+  if (!write(self->in_w, &sz, sizeof(sz))) {
     return 1;
   }
-  if (!write(self->in_w, buf, len))
-  {
+  if (!write(self->in_w, buf, len)) {
     return 3;
   }
   return 0;
 }
 
-int process_read(struct process *self, void **buf, size_t *len)
-{
+int process_read(struct process *self, void **buf, size_t *len) {
   struct queue_item *qi = queue_pop(self->q);
-  if (!qi)
-  {
+  if (!qi) {
     return 1;
   }
-  if (self->previous_queue_item)
-  {
+  if (self->previous_queue_item) {
     free(self->previous_queue_item);
   }
   self->previous_queue_item = qi;
-  if (qi->buf == NULL && qi->len == -1)
-  {
+  if (qi->buf == NULL && qi->len == -1) {
     return 2;
   }
   *buf = qi->buf;
@@ -322,8 +273,8 @@ int process_read(struct process *self, void **buf, size_t *len)
   return 0;
 }
 
-struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, const WCHAR *envvar_value)
-{
+struct process *
+process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, wchar_t const *const envvar_value) {
   HANDLE in_r = INVALID_HANDLE_VALUE;
   HANDLE in_w = INVALID_HANDLE_VALUE;
   HANDLE in_w_tmp = INVALID_HANDLE_VALUE;
@@ -336,33 +287,27 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
   HANDLE err_w = INVALID_HANDLE_VALUE;
   HANDLE err_r_tmp = INVALID_HANDLE_VALUE;
 
-  WCHAR *env = NULL, *path = NULL, *dir = NULL;
+  wchar_t *env = NULL, *path = NULL, *dir = NULL;
 
   SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), 0, TRUE};
-  if (!CreatePipe(&in_r, &in_w_tmp, &sa, 0))
-  {
+  if (!CreatePipe(&in_r, &in_w_tmp, &sa, 0)) {
     goto cleanup;
   }
-  if (!CreatePipe(&out_r_tmp, &out_w, &sa, 0))
-  {
+  if (!CreatePipe(&out_r_tmp, &out_w, &sa, 0)) {
     goto cleanup;
   }
-  if (!CreatePipe(&err_r_tmp, &err_w, &sa, 0))
-  {
+  if (!CreatePipe(&err_r_tmp, &err_w, &sa, 0)) {
     goto cleanup;
   }
 
   HANDLE curproc = GetCurrentProcess();
-  if (!DuplicateHandle(curproc, in_w_tmp, curproc, &in_w, 0, FALSE, DUPLICATE_SAME_ACCESS))
-  {
+  if (!DuplicateHandle(curproc, in_w_tmp, curproc, &in_w, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
     goto cleanup;
   }
-  if (!DuplicateHandle(curproc, out_r_tmp, curproc, &out_r, 0, FALSE, DUPLICATE_SAME_ACCESS))
-  {
+  if (!DuplicateHandle(curproc, out_r_tmp, curproc, &out_r, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
     goto cleanup;
   }
-  if (!DuplicateHandle(curproc, err_r_tmp, curproc, &err_r, 0, FALSE, DUPLICATE_SAME_ACCESS))
-  {
+  if (!DuplicateHandle(curproc, err_r_tmp, curproc, &err_r, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
     goto cleanup;
   }
 
@@ -374,23 +319,20 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
   err_r_tmp = INVALID_HANDLE_VALUE;
 
   env = build_environment_strings(envvar_name, envvar_value);
-  if (!env)
-  {
+  if (!env) {
     goto cleanup;
   }
 
   // have to copy this buffer because CreateProcessW may modify path string.
   int pathlen = lstrlenW(exe_path) + 1;
   path = calloc((size_t)pathlen, sizeof(WCHAR));
-  if (!path)
-  {
+  if (!path) {
     goto cleanup;
   }
   wsprintfW(path, L"%s", exe_path);
 
   dir = get_working_directory(exe_path);
-  if (!dir)
-  {
+  if (!dir) {
     goto cleanup;
   }
 
@@ -402,8 +344,7 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
   si.hStdInput = in_r;
   si.hStdOutput = out_w;
   si.hStdError = err_w;
-  if (!CreateProcessW(0, path, NULL, NULL, TRUE, CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, env, dir, &si, &pi))
-  {
+  if (!CreateProcessW(0, path, NULL, NULL, TRUE, CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, env, dir, &si, &pi)) {
     goto cleanup;
   }
   free(dir);
@@ -422,8 +363,7 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
   out_w = INVALID_HANDLE_VALUE;
 
   struct process *r = calloc(1, sizeof(struct process));
-  if (!r)
-  {
+  if (!r) {
     CloseHandle(pi.hProcess);
     pi.hProcess = INVALID_HANDLE_VALUE;
     goto cleanup;
@@ -434,15 +374,13 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
   r->err_r = err_r;
 
   r->q = queue_init((void **)r->queue_items, 2);
-  if (!r->q)
-  {
+  if (!r->q) {
     CloseHandle(pi.hProcess);
     pi.hProcess = INVALID_HANDLE_VALUE;
     free(r);
     goto cleanup;
   }
-  if (thrd_create(&r->thread, read_worker, r) != thrd_success)
-  {
+  if (thrd_create(&r->thread, read_worker, r) != thrd_success) {
     CloseHandle(pi.hProcess);
     pi.hProcess = INVALID_HANDLE_VALUE;
     queue_destroy(r->q);
@@ -452,100 +390,81 @@ struct process *process_start(const WCHAR *exe_path, const WCHAR *envvar_name, c
   return r;
 
 cleanup:
-  if (dir)
-  {
+  if (dir) {
     free(dir);
     dir = NULL;
   }
-  if (path)
-  {
+  if (path) {
     free(path);
     path = NULL;
   }
-  if (env)
-  {
+  if (env) {
     free(env);
     env = NULL;
   }
 
-  if (pi.hThread != INVALID_HANDLE_VALUE)
-  {
+  if (pi.hThread != INVALID_HANDLE_VALUE) {
     CloseHandle(pi.hThread);
     pi.hThread = INVALID_HANDLE_VALUE;
   }
-  if (pi.hProcess != INVALID_HANDLE_VALUE)
-  {
+  if (pi.hProcess != INVALID_HANDLE_VALUE) {
     CloseHandle(pi.hProcess);
     pi.hProcess = INVALID_HANDLE_VALUE;
   }
 
-  if (err_r != INVALID_HANDLE_VALUE)
-  {
+  if (err_r != INVALID_HANDLE_VALUE) {
     CloseHandle(err_r);
     err_r = INVALID_HANDLE_VALUE;
   }
-  if (err_w != INVALID_HANDLE_VALUE)
-  {
+  if (err_w != INVALID_HANDLE_VALUE) {
     CloseHandle(err_w);
     err_w = INVALID_HANDLE_VALUE;
   }
-  if (err_r_tmp != INVALID_HANDLE_VALUE)
-  {
+  if (err_r_tmp != INVALID_HANDLE_VALUE) {
     CloseHandle(err_r_tmp);
     err_r_tmp = INVALID_HANDLE_VALUE;
   }
-  if (out_r != INVALID_HANDLE_VALUE)
-  {
+  if (out_r != INVALID_HANDLE_VALUE) {
     CloseHandle(out_r);
     out_r = INVALID_HANDLE_VALUE;
   }
-  if (out_w != INVALID_HANDLE_VALUE)
-  {
+  if (out_w != INVALID_HANDLE_VALUE) {
     CloseHandle(out_w);
     out_w = INVALID_HANDLE_VALUE;
   }
-  if (out_r_tmp != INVALID_HANDLE_VALUE)
-  {
+  if (out_r_tmp != INVALID_HANDLE_VALUE) {
     CloseHandle(out_r_tmp);
     out_r_tmp = INVALID_HANDLE_VALUE;
   }
-  if (in_r != INVALID_HANDLE_VALUE)
-  {
+  if (in_r != INVALID_HANDLE_VALUE) {
     CloseHandle(in_r);
     in_r = INVALID_HANDLE_VALUE;
   }
-  if (in_w != INVALID_HANDLE_VALUE)
-  {
+  if (in_w != INVALID_HANDLE_VALUE) {
     CloseHandle(in_w);
     in_w = INVALID_HANDLE_VALUE;
   }
-  if (in_w_tmp != INVALID_HANDLE_VALUE)
-  {
+  if (in_w_tmp != INVALID_HANDLE_VALUE) {
     CloseHandle(in_w_tmp);
     in_w_tmp = INVALID_HANDLE_VALUE;
   }
   return NULL;
 }
 
-void process_finish(struct process *self)
-{
-  if (self->in_w != INVALID_HANDLE_VALUE)
-  {
+void process_finish(struct process *self) {
+  if (self->in_w != INVALID_HANDLE_VALUE) {
     CloseHandle(self->in_w);
     self->in_w = INVALID_HANDLE_VALUE;
   }
-  if (self->out_r != INVALID_HANDLE_VALUE)
-  {
+  if (self->out_r != INVALID_HANDLE_VALUE) {
     CloseHandle(self->out_r);
     self->out_r = INVALID_HANDLE_VALUE;
   }
-  if (self->err_r != INVALID_HANDLE_VALUE)
-  {
+  if (self->err_r != INVALID_HANDLE_VALUE) {
     CloseHandle(self->err_r);
     self->err_r = INVALID_HANDLE_VALUE;
   }
-  if (self->process != INVALID_HANDLE_VALUE)
-  {
+  if (self->process != INVALID_HANDLE_VALUE) {
     CloseHandle(self->process);
     self->process = INVALID_HANDLE_VALUE;
   }
@@ -559,8 +478,7 @@ void process_finish(struct process *self)
   // }
   thrd_detach(self->thread);
   struct queue_item *qi = NULL;
-  while ((qi = queue_pop(self->q)))
-  {
+  while ((qi = queue_pop(self->q))) {
     if (qi->buf == NULL && qi->len == -1) {
       free(qi);
       break;
@@ -568,22 +486,17 @@ void process_finish(struct process *self)
     free(qi);
   }
 
-  if (self->previous_queue_item)
-  {
+  if (self->previous_queue_item) {
     free(self->previous_queue_item);
     self->previous_queue_item = NULL;
-  } 
+  }
   queue_destroy(self->q);
   free(self);
 }
 
-void process_close_stderr(struct process *self)
-{
+void process_close_stderr(struct process *self) {
   CloseHandle(self->err_r);
   self->err_r = INVALID_HANDLE_VALUE;
 }
 
-bool process_isrunning(const struct process *self)
-{
-  return WaitForSingleObject(self->process, 0) == WAIT_TIMEOUT;
-}
+bool process_isrunning(const struct process *self) { return WaitForSingleObject(self->process, 0) == WAIT_TIMEOUT; }

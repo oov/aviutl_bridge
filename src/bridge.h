@@ -1,10 +1,9 @@
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
-struct share_mem_header
-{
+struct share_mem_header {
   uint32_t header_size;
   uint32_t body_size;
   uint32_t version;
@@ -12,8 +11,7 @@ struct share_mem_header
   uint32_t height;
 };
 
-enum ECALL
-{
+enum ECALL {
   ECALL_OK,
   ECALL_NOT_INITIALIZED,
   ECALL_FAILED_TO_CONVERT_EXE_PATH,
@@ -22,15 +20,13 @@ enum ECALL
   ECALL_FAILED_TO_RECEIVE_COMMAND,
 };
 
-enum mem_mode
-{
+enum mem_mode {
   MEM_MODE_READ = 1,
   MEM_MODE_WRITE = 2,
   MEM_MODE_DIRECT = 4,
 };
 
-struct call_mem
-{
+struct call_mem {
   void *buf;
   int32_t mode;
   int32_t width;
